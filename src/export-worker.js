@@ -1,9 +1,10 @@
-import {Input,BlobSource,ALL_FORMATS,Output,Mp4OutputFormat,BufferTarget,StreamTarget,Conversion} from '../vendor/mediabunny.mjs';
+import {Input,BlobSource,ALL_FORMATS,Output,Mp4OutputFormat,BufferTarget,StreamTarget,Conversion,canEncodeVideo} from '../vendor/mediabunny.mjs';
 self.onmessage=async({data})=>{
  const {file,project,jobId}=data;
  let input,handle,root,success=false;
  try{
   const c=project.clips[0],p=project.proj;
+  if(!await canEncodeVideo('avc',{width:p.w,height:p.h,bitrate:p.bitrate*1e6}))throw new Error('ENCODE_UNSUPPORTED: '+p.w+'x'+p.h);
   input=new Input({source:new BlobSource(file),formats:ALL_FORMATS});
   const vt=await input.getPrimaryVideoTrack(),at=await input.getPrimaryAudioTrack();
   if(!vt)throw new Error('NO_VIDEO');
@@ -28,7 +29,7 @@ self.onmessage=async({data})=>{
   }
   const output=new Output({format:new Mp4OutputFormat({fastStart:false}),target});
   const conversion=await Conversion.init({input,output,
-   video:t=>t.id===vt.id?{codec:'avc',width:p.w,height:p.h,fit:'contain',frameRate:30,bitrate:4e6,forceTranscode:true,allowRotationMetadata:false}:{discard:true},
+   video:t=>t.id===vt.id?{codec:'avc',width:p.w,height:p.h,fit:'contain',frameRate:30,bitrate:p.bitrate*1e6,forceTranscode:true,allowRotationMetadata:false}:{discard:true},
    audio:t=>t.id===at?.id?{codec:'aac',sampleRate:48000,numberOfChannels:2,bitrate:192000,forceTranscode:true}:{discard:true},
    trim:{start:c.inP,end:c.outP},tags:{}});
   const lost=conversion.discardedTracks.filter(d=>d.track.id===vt.id||d.track.id===at?.id);

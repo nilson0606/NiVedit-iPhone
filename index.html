@@ -5,9 +5,9 @@
 <body><div class="app">
 <header><a class="brand" href="./">NiV<span>edit</span><small>iPhone</small></a><div class="header-actions"><button id="theme" aria-label="切換日夜模式">☀</button><button id="language">EN</button><button class="primary" id="export" disabled data-i18n="export">匯出</button></div></header>
 <main>
-<section class="viewer"><div class="section-line"><span class="eyebrow" data-i18n="preview">影片預覽</span><span class="badge">PREVIEW 0.1</span></div>
+<section class="viewer"><div class="section-line"><span class="eyebrow" data-i18n="preview">影片預覽</span><span class="badge">PREVIEW 0.1.1</span></div>
 <div class="screen" id="screen"><video id="video" playsinline preload="metadata"></video><div id="empty"><div class="empty-icon">＋</div><h1 data-i18n="emptyTitle">把日常，剪成故事。</h1><p data-i18n="emptyText">從相簿或檔案選一段影片開始</p><button class="primary" id="importHero" data-i18n="import">選擇影片</button></div></div>
-<div class="transport"><button id="rewind" disabled aria-label="回到開頭">|◀</button><button id="play" disabled class="play" aria-label="播放或暫停">▶</button><output id="time">00:00.0 / 00:00.0</output><span class="chip">720p · 30</span></div>
+<div class="transport"><button id="rewind" disabled aria-label="回到開頭">|◀</button><button id="play" disabled class="play" aria-label="播放或暫停">▶</button><output id="time">00:00.0 / 00:00.0</output><span class="chip" id="outputChip">720p · 30</span></div>
 <input type="range" id="seek" aria-label="播放位置" min="0" max="1" step="0.01" value="0" disabled>
 </section>
 <section class="editor"><div class="section-line"><h2 data-i18n="timeline">時間軸</h2><div><button id="undo" disabled aria-label="復原">↶</button><button id="redo" disabled aria-label="重做">↷</button></div></div>
@@ -20,11 +20,11 @@
 <div class="selection"><span data-i18n="keep">保留長度</span><strong id="duration">0.00 s</strong><span id="audioInfo"></span></div>
 </section>
 <section class="project-bar"><span id="draftState" data-i18n="draftHint">影片只在這台裝置處理</span><button id="saveDraft" disabled data-i18n="draft">儲存草稿</button></section>
-<p id="status" role="status" aria-live="polite" data-i18n="phaseHint">第一階段測試版：匯入、剪頭尾、720p 匯出。完整 V13 功能將分階段加入。</p>
+<p id="status" role="status" aria-live="polite" data-i18n="phaseHint">第一階段測試版：匯入、剪頭尾、720p／1080p 匯出。完整 V13 功能將分階段加入。</p>
 <div id="restoreBox" hidden class="notice"><span data-i18n="draftFound">找到上次儲存的草稿</span><button id="restore" data-i18n="restore">恢復草稿</button></div>
 </main>
 <nav class="bottom-nav"><button id="importBottom"><span>＋</span><span data-i18n="media">素材</span></button><button id="newProject"><span>▱</span><span data-i18n="new">新建</span></button><a href="./manual.html" target="_blank" rel="noopener"><span>☷</span><span data-i18n="manual">手冊</span></a><button id="diagnostics"><span>ⓘ</span><span data-i18n="device">裝置</span></button></nav>
 </div><input id="file" type="file" accept="video/*,.mov,.mp4,.m4v,.webm" hidden>
-<dialog id="exportDialog"><div class="dialog-heading"><h2 id="exportTitle" data-i18n="exportTitle">匯出影片</h2><button id="closeExport" aria-label="關閉">×</button></div><p id="exportSpec"></p><p id="exportStatus" role="status"></p><progress id="progress" value="0" max="1"></progress><p class="muted" id="exportHint" data-i18n="foreground">匯出時請保持此頁開啟。完成後可儲存或分享。</p><video id="resultVideo" controls playsinline hidden></video><div class="dialog-actions"><button id="startExport" class="primary" data-i18n="startExport">開始匯出</button><button id="cancelExport" hidden data-i18n="cancel">取消</button><button id="share" hidden class="primary" data-i18n="share">分享／儲存到檔案</button><a id="download" class="button" hidden data-i18n="download">下載 MP4</a></div></dialog>
+<dialog id="exportDialog"><div class="dialog-heading"><h2 id="exportTitle" data-i18n="exportTitle">匯出影片</h2><button id="closeExport" aria-label="關閉">×</button></div><label class="export-setting"><span data-i18n="resolution">輸出畫質</span><select id="resolution"><option value="720" data-i18n="resolution720">720p · 標準</option><option value="1080" data-i18n="resolution1080">1080p · 高畫質</option></select></label><p id="exportSpec"></p><p data-i18n="resolutionNote">1080p 檔案較大；若原片解析度較低，放大不會增加原有細節。</p><p id="exportStatus" role="status"></p><progress id="progress" value="0" max="1"></progress><p class="muted" id="exportHint" data-i18n="foreground">匯出時請保持此頁開啟。完成後可儲存或分享。</p><video id="resultVideo" controls playsinline hidden></video><div class="dialog-actions"><button id="startExport" class="primary" data-i18n="startExport">開始匯出</button><button id="cancelExport" hidden data-i18n="cancel">取消</button><button id="share" hidden class="primary" data-i18n="share">分享／儲存到檔案</button><a id="download" class="button" hidden data-i18n="download">下載 MP4</a></div></dialog>
 <dialog id="deviceDialog"><div class="dialog-heading"><h2 data-i18n="deviceTitle">裝置能力</h2><button id="closeDevice" aria-label="關閉">×</button></div><p data-i18n="probeNote">這是 API 探測結果，並不代表已通過 iPhone 實機測試。</p><pre id="deviceInfo"></pre><button id="copyDiagnostics" data-i18n="copy">複製診斷</button></dialog>
 <script type="module" src="./src/app.js"></script></body></html>

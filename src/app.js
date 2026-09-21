@@ -1,5 +1,5 @@
 import {Input,BlobSource,ALL_FORMATS,canEncodeVideo,canEncodeAudio} from '../vendor/mediabunny.mjs';
-import {makeProject,setTrim,formatTime,VERSION,BASELINE} from './model.js';
+import {makeProject,setTrim,setResolution,formatTime,VERSION,BASELINE} from './model.js';
 import {draft} from './storage.js';
 import {strings} from './i18n.js';
 const $=id=>document.getElementById(id),video=$('video');
@@ -22,6 +22,8 @@ function render(){
  for(const id of ['play','rewind','seek','in','out','inRange','outRange','reset','saveDraft','export'])$(id).disabled=!loaded||importing||busy;
  $('undo').disabled=!history.length||!loaded;$('redo').disabled=!future.length||!loaded;
  $('empty').hidden=loaded;
+ $('outputChip').textContent=(loaded?Math.min(project.proj.w,project.proj.h):720)+'p · 30';
+ if(loaded)renderExportSettings();
  if(!loaded){$('filename').textContent=t('noClip');$('clipDuration').textContent='—';$('duration').textContent='0.00 s';$('audioInfo').textContent='';$('time').textContent='00:00.0 / 00:00.0';return;}
  const clip=c(),dur=clip.outP-clip.inP;
  $('filename').textContent=file.name;$('clipDuration').textContent=dur.toFixed(2)+' s';$('duration').textContent=dur.toFixed(2)+' s';
@@ -85,9 +87,11 @@ $('saveDraft').onclick=async()=>{clearTimeout(saveTimer);await saveDraft();say('
 $('restore').onclick=async()=>{try{const value=await draft('get');if(value?.file)await importFile(value.file,value.project);}catch{say('saveFailed');}};
 $('newProject').onclick=async()=>{if(importing||busy)return;if(project&&!confirm(t('newConfirm')))return;clearTimeout(saveTimer);await saveQueue.catch(()=>{});pause();await releaseResult();if(sourceUrl)URL.revokeObjectURL(sourceUrl);sourceUrl=null;video.removeAttribute('src');video.load();project=file=meta=null;history=[];future=[];try{await draft('delete');}catch{}$('restoreBox').hidden=true;render();say('phaseHint');};
 draft('get').then(value=>{$('restoreBox').hidden=!value?.file;}).catch(()=>{});
-function setBusy(value){if(!value)clearTimeout(exportWatchdog);busy=value;document.body.classList.toggle('busy',value);$('cancelExport').hidden=!value;$('closeExport').disabled=value;$('startExport').hidden=value;$('export').disabled=value||!project;}
+function renderExportSettings(){if(!project)return;$('resolution').value=String(Math.min(project.proj.w,project.proj.h));$('exportSpec').textContent=project.proj.w+' × '+project.proj.h+' · 30 fps · '+project.proj.bitrate+' Mbps · MP4 / H.264'+(meta.hasAudio?' + AAC':' · '+t('silent'));}
+$('resolution').onchange=()=>{if(busy||!project)return;const value=+$('resolution').value;if(value===Math.min(project.proj.w,project.proj.h))return;recordBefore();setResolution(project,value);releaseResult();render();queueSave();$('exportStatus').textContent=t('foreground');};
+function setBusy(value){$('resolution').disabled=value;if(!value)clearTimeout(exportWatchdog);busy=value;document.body.classList.toggle('busy',value);$('cancelExport').hidden=!value;$('closeExport').disabled=value;$('startExport').hidden=value;$('export').disabled=value||!project;}
 async function releaseResult(){if(resultUrl){$('resultVideo').pause();$('resultVideo').removeAttribute('src');$('resultVideo').load();URL.revokeObjectURL(resultUrl);}resultUrl=null;result=null;$('resultVideo').hidden=true;$('share').hidden=true;$('download').hidden=true;if(jobId){try{const root=await navigator.storage?.getDirectory();await root?.removeEntry(jobId);}catch{}jobId=null;}}
-$('export').onclick=()=>{pause();$('exportSpec').textContent=project.proj.w+' × '+project.proj.h+' · 30 fps · MP4 / H.264'+(meta.hasAudio?' + AAC':' · '+t('silent'));$('exportStatus').textContent=result?t('done'):t('foreground');$('startExport').hidden=false;$('exportDialog').showModal();};
+$('export').onclick=()=>{pause();renderExportSettings();$('exportStatus').textContent=result?t('done'):t('foreground');$('startExport').hidden=false;$('exportDialog').showModal();};
 async function stopExport(reason='cancelled'){
  if(!busy)return;worker?.terminate();worker=null;await releaseResult();wakeLock?.release().catch(()=>{});wakeLock=null;setBusy(false);$('exportStatus').textContent=t(reason);$('progress').value=0;
 }
@@ -117,7 +121,7 @@ $('startExport').onclick=async()=>{
      check=new Input({source:new BlobSource(data.blob),formats:ALL_FORMATS});
      const v=await check.getPrimaryVideoTrack(),a=await check.getPrimaryAudioTrack(),d=await check.computeDuration();
      if(worker!==activeWorker)return;
-     if(!v||(meta.hasAudio&&!a)||Math.abs(d-(c().outP-c().inP))>.25)throw new Error('OUTPUT_VALIDATION_FAILED');
+     if(!v||v.displayWidth!==project.proj.w||v.displayHeight!==project.proj.h||(meta.hasAudio&&!a)||Math.abs(d-(c().outP-c().inP))>.25)throw new Error('OUTPUT_VALIDATION_FAILED');
      result=new File([data.blob],'NiVedit-iPhone-'+new Date().toISOString().replace(/[:.]/g,'-')+'.mp4',{type:'video/mp4'});
      resultUrl=URL.createObjectURL(result);await waitVideo($('resultVideo'),resultUrl);
      if(worker!==activeWorker)return;
@@ -134,7 +138,7 @@ $('share').onclick=async()=>{if(!result)return;if(!navigator.canShare?.({files:[
 $('download').onclick=()=>$('exportStatus').textContent=t('downloaded');
 async function probe(){
  const report={secureContext:isSecureContext,videoEncoder:typeof VideoEncoder!=='undefined',audioEncoder:typeof AudioEncoder!=='undefined',webGPU:!!navigator.gpu,opfs:!!navigator.storage?.getDirectory,fileShare:!!navigator.canShare,standalone:matchMedia('(display-mode: standalone)').matches};
- for(const [key,fn] of Object.entries({h264_720p:()=>canEncodeVideo('avc',{width:1280,height:720,bitrate:4e6}),h264_4k:()=>canEncodeVideo('avc',{width:3840,height:2160,bitrate:16e6}),aac:()=>canEncodeAudio('aac',{sampleRate:48000,numberOfChannels:2,bitrate:192000})})){try{report[key]=await timeout(fn(),5000);}catch{report[key]='unknown';}}
+ for(const [key,fn] of Object.entries({h264_720p:()=>canEncodeVideo('avc',{width:1280,height:720,bitrate:4e6}),h264_1080p:()=>canEncodeVideo('avc',{width:1920,height:1080,bitrate:8e6}),h264_1080p_portrait:()=>canEncodeVideo('avc',{width:1080,height:1920,bitrate:8e6}),h264_4k:()=>canEncodeVideo('avc',{width:3840,height:2160,bitrate:16e6}),aac:()=>canEncodeAudio('aac',{sampleRate:48000,numberOfChannels:2,bitrate:192000})})){try{report[key]=await timeout(fn(),5000);}catch{report[key]='unknown';}}
  try{report.storage=await navigator.storage?.estimate();}catch{}
  diagnostic={...diagnostic,...report};return diagnostic;
 }
