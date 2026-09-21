@@ -48,6 +48,7 @@ const server=http.createServer((req,res)=>{
  await exportAndSave('output-retry.mp4');check('export retry after cancellation');
  await page.locator('#file').setInputFiles(path.join(qa,'portrait.mp4'));await page.waitForFunction(()=>document.querySelector('#filename').textContent==='portrait.mp4');
  await exportAndSave('output-portrait.mp4');check('portrait output');
+ await page.locator('#file').setInputFiles(path.join(qa,'rotated.mp4'));await page.waitForFunction(()=>document.querySelector('#filename').textContent==='rotated.mp4');await exportAndSave('output-rotated.mp4');check('rotation metadata export');
  await page.locator('#theme').click();await page.screenshot({path:path.join(qa,'mobile-light.png'),fullPage:true});check('light theme');
  await page.setViewportSize({width:844,height:390});await page.screenshot({path:path.join(qa,'landscape-ui.png'),fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);check('landscape viewport');
  await page.locator('#language').click();assert.equal(await page.locator('#export').textContent(),'Export');check('English');

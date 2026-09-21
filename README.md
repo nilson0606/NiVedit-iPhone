@@ -7,6 +7,7 @@ Desktop NiVedit is not modified or deployed by this repository.
 - Plan: [To_IPhone.md](docs/To_IPhone.md).
 - Status: [phase-1.md](docs/phase-1.md).
 - Local development: `python -m http.server 8093 --bind 127.0.0.1`, then open http://localhost:8093/.
+- Generate test fixtures: `python tests/make-fixtures.py --ffmpeg /path/to/ffmpeg`.
 - Tests: `node --test tests/model.test.mjs`; browser integration: `node tests/browser.cjs` (Playwright, Edge, generated QA fixtures).
 - No build required. Serve via HTTPS or localhost, not file://.
 - Dependency: vendored, unmodified Mediabunny **1.58.1** (MPL-2.0), for lazy Blob reads, decoding, timed transcoding and muxing. No runtime CDN dependency. See [THIRD_PARTY.md](THIRD_PARTY.md).
