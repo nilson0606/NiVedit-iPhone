@@ -1,5 +1,5 @@
 import {Input,BlobSource,ALL_FORMATS,canEncodeVideo,canEncodeAudio} from '../vendor/mediabunny.mjs';
-import {makeProject,setTrim,setResolution,formatTime,VERSION,BASELINE} from './model.js';
+import {makeProject,setTrim,setResolution,setAspect,formatTime,VERSION,BASELINE} from './model.js';
 import {draft} from './storage.js';
 import {strings} from './i18n.js';
 const $=id=>document.getElementById(id),video=$('video');
@@ -23,7 +23,8 @@ function render(){
  $('undo').disabled=!history.length||!loaded;$('redo').disabled=!future.length||!loaded;
  $('empty').hidden=loaded;
  $('outputChip').textContent=(loaded?Math.min(project.proj.w,project.proj.h):720)+'p · 30';
- if(loaded)renderExportSettings();
+ $('screen').classList.toggle('has-media',loaded);
+ if(loaded){renderExportSettings();renderPreviewSize();}
  if(!loaded){$('filename').textContent=t('noClip');$('clipDuration').textContent='—';$('duration').textContent='0.00 s';$('audioInfo').textContent='';$('time').textContent='00:00.0 / 00:00.0';return;}
  const clip=c(),dur=clip.outP-clip.inP;
  $('filename').textContent=file.name;$('clipDuration').textContent=dur.toFixed(2)+' s';$('duration').textContent=dur.toFixed(2)+' s';
@@ -33,6 +34,13 @@ function render(){
  $('seek').min=clip.inP;$('seek').max=clip.outP;
  $('middle').textContent=formatTime(dur/2);$('end').textContent=formatTime(dur);updateTime();
 }
+function renderPreviewSize(){
+ if(!project)return;
+ const screen=$('screen'),ratio=project.proj.w/project.proj.h;
+ const width=Math.min(screen.clientWidth-2,(screen.clientHeight-2)*ratio);
+ video.style.width=width+'px';video.style.height=width/ratio+'px';
+}
+new ResizeObserver(renderPreviewSize).observe($('screen'));
 function updateTime(){if(!project)return;$('seek').value=Math.max(c().inP,Math.min(c().outP,video.currentTime));$('time').textContent=formatTime(video.currentTime-c().inP)+' / '+formatTime(c().outP-c().inP);}
 function pause(){video.pause();$('play').textContent='▶';}
 video.addEventListener('timeupdate',()=>{if(project&&video.currentTime>=c().outP&&!video.paused){pause();video.currentTime=c().outP;}updateTime();});
@@ -87,9 +95,10 @@ $('saveDraft').onclick=async()=>{clearTimeout(saveTimer);await saveDraft();say('
 $('restore').onclick=async()=>{try{const value=await draft('get');if(value?.file)await importFile(value.file,value.project);}catch{say('saveFailed');}};
 $('newProject').onclick=async()=>{if(importing||busy)return;if(project&&!confirm(t('newConfirm')))return;clearTimeout(saveTimer);await saveQueue.catch(()=>{});pause();await releaseResult();if(sourceUrl)URL.revokeObjectURL(sourceUrl);sourceUrl=null;video.removeAttribute('src');video.load();project=file=meta=null;history=[];future=[];try{await draft('delete');}catch{}$('restoreBox').hidden=true;render();say('phaseHint');};
 draft('get').then(value=>{$('restoreBox').hidden=!value?.file;}).catch(()=>{});
-function renderExportSettings(){if(!project)return;$('resolution').value=String(Math.min(project.proj.w,project.proj.h));$('exportSpec').textContent=project.proj.w+' × '+project.proj.h+' · 30 fps · '+project.proj.bitrate+' Mbps · MP4 / H.264'+(meta.hasAudio?' + AAC':' · '+t('silent'));}
+function renderExportSettings(){if(!project)return;$('aspect').value=project.proj.w<project.proj.h?'9:16':'16:9';$('resolution').value=String(Math.min(project.proj.w,project.proj.h));$('exportSpec').textContent=project.proj.w+' × '+project.proj.h+' · 30 fps · '+project.proj.bitrate+' Mbps · MP4 / H.264'+(meta.hasAudio?' + AAC':' · '+t('silent'));}
+$('aspect').onchange=()=>{if(busy||!project)return;const aspect=$('aspect').value;if(aspect===project.proj.aspect)return;recordBefore();setAspect(project,aspect);releaseResult();render();queueSave();$('exportStatus').textContent=t('foreground');};
 $('resolution').onchange=()=>{if(busy||!project)return;const value=+$('resolution').value;if(value===Math.min(project.proj.w,project.proj.h))return;recordBefore();setResolution(project,value);releaseResult();render();queueSave();$('exportStatus').textContent=t('foreground');};
-function setBusy(value){$('resolution').disabled=value;if(!value)clearTimeout(exportWatchdog);busy=value;document.body.classList.toggle('busy',value);$('cancelExport').hidden=!value;$('closeExport').disabled=value;$('startExport').hidden=value;$('export').disabled=value||!project;}
+function setBusy(value){$('aspect').disabled=value;$('resolution').disabled=value;if(!value)clearTimeout(exportWatchdog);busy=value;document.body.classList.toggle('busy',value);$('cancelExport').hidden=!value;$('closeExport').disabled=value;$('startExport').hidden=value;$('export').disabled=value||!project;}
 async function releaseResult(){if(resultUrl){$('resultVideo').pause();$('resultVideo').removeAttribute('src');$('resultVideo').load();URL.revokeObjectURL(resultUrl);}resultUrl=null;result=null;$('resultVideo').hidden=true;$('share').hidden=true;$('download').hidden=true;if(jobId){try{const root=await navigator.storage?.getDirectory();await root?.removeEntry(jobId);}catch{}jobId=null;}}
 $('export').onclick=()=>{pause();renderExportSettings();$('exportStatus').textContent=result?t('done'):t('foreground');$('startExport').hidden=false;$('exportDialog').showModal();};
 async function stopExport(reason='cancelled'){

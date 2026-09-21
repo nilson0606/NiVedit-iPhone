@@ -33,9 +33,9 @@ const server=http.createServer((req,res)=>{
  await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
  await page.screenshot({path:path.join(qa,'mobile-editor.png'),fullPage:true});
  const previewMean=await page.evaluate(()=>{const v=document.querySelector('#video'),c=document.createElement('canvas');c.width=c.height=32;const x=c.getContext('2d');x.drawImage(v,0,0,32,32);const a=x.getImageData(0,0,32,32).data;let sum=0;for(let i=0;i<a.length;i+=4)sum+=a[i]+a[i+1]+a[i+2];return sum/(32*32*3);});assert.ok(previewMean>20);check('restored preview has decoded pixels',previewMean);
- async function exportAndSave(name,resolution=null){
-  await page.locator('#export').click();if(resolution)await page.locator('#resolution').selectOption(String(resolution));await page.locator('#startExport').click();
-  assert.equal(await page.locator('#resolution').isDisabled(),true);
+ async function exportAndSave(name,resolution=null,aspect=null){
+  await page.locator('#export').click();if(aspect)await page.locator('#aspect').selectOption(aspect);if(resolution)await page.locator('#resolution').selectOption(String(resolution));await page.locator('#startExport').click();
+  assert.equal(await page.locator('#resolution').isDisabled(),true);assert.equal(await page.locator('#aspect').isDisabled(),true);
   await page.waitForFunction(()=>!document.querySelector('#download').hidden||(!document.body.classList.contains('busy')&&document.querySelector('#exportStatus').textContent.includes('失敗')),{},{timeout:120000}).catch(async e=>{throw new Error(e.message+' STATUS '+await page.locator('#exportStatus').textContent());});
   if(await page.locator('#download').isHidden())throw new Error(await page.locator('#exportStatus').textContent());
   const dl=page.waitForEvent('download');await page.locator('#download').click();await(await dl).saveAs(path.join(qa,name));
@@ -48,11 +48,16 @@ const server=http.createServer((req,res)=>{
  await page.locator('#export').click();await page.locator('#startExport').click();await page.locator('#cancelExport').click();await page.waitForFunction(()=>!document.body.classList.contains('busy'));assert.match(await page.locator('#exportStatus').textContent(),/取消/);await page.locator('#closeExport').click();check('cancel active export');
  await exportAndSave('output-retry.mp4');check('export retry after cancellation');
  await exportAndSave('output-1080-landscape.mp4',1080);check('1080p landscape export');
+ await exportAndSave('output-landscape-to-portrait.mp4',1080,'9:16');check('landscape source to portrait canvas');
+ let box=await page.locator('#video').boundingBox();assert.ok(Math.abs(box.width/box.height-9/16)<.01);check('portrait preview canvas ratio');
+ await page.locator('#undo').click();box=await page.locator('#video').boundingBox();assert.ok(Math.abs(box.width/box.height-16/9)<.01);
+ await page.locator('#redo').click();box=await page.locator('#video').boundingBox();assert.ok(Math.abs(box.width/box.height-9/16)<.01);check('orientation undo / redo');
+
  assert.equal(await page.locator('#outputChip').textContent(),'1080p · 30');
  await page.locator('#saveDraft').click();await page.waitForFunction(()=>document.querySelector('#draftState').textContent.includes('已儲存'));
  await page.reload();await page.locator('#restore').click();await page.waitForFunction(()=>!document.querySelector('#export').disabled);
  assert.equal(await page.locator('#outputChip').textContent(),'1080p · 30');check('1080p setting survives draft reload');
- await page.locator('#export').click();assert.equal(await page.locator('#resolution').inputValue(),'1080');
+ await page.locator('#export').click();assert.equal(await page.locator('#resolution').inputValue(),'1080');assert.equal(await page.locator('#aspect').inputValue(),'9:16');check('orientation survives draft restore');
  await page.locator('#resolution').selectOption('720');await page.locator('#closeExport').click();
  await page.locator('#undo').click();assert.equal(await page.locator('#outputChip').textContent(),'1080p · 30');
  await page.locator('#redo').click();assert.equal(await page.locator('#outputChip').textContent(),'720p · 30');check('resolution undo / redo');
@@ -60,6 +65,9 @@ const server=http.createServer((req,res)=>{
  await page.locator('#file').setInputFiles(path.join(qa,'portrait.mp4'));await page.waitForFunction(()=>document.querySelector('#filename').textContent==='portrait.mp4');
  await exportAndSave('output-portrait.mp4');check('portrait output');
  await exportAndSave('output-1080-portrait.mp4',1080);check('1080p portrait export');
+ await exportAndSave('output-portrait-to-landscape.mp4',1080,'16:9');check('portrait source to landscape canvas');
+ await page.locator('#export').click();await page.screenshot({path:path.join(qa,'orientation-settings.png')});await page.locator('#closeExport').click();
+
  await page.locator('#export').click();await page.locator('#resolution').selectOption('720');assert.equal(await page.locator('#download').isHidden(),true);await page.locator('#closeExport').click();check('resolution change clears old result');
  await page.locator('#file').setInputFiles(path.join(qa,'rotated.mp4'));await page.waitForFunction(()=>document.querySelector('#filename').textContent==='rotated.mp4');await exportAndSave('output-rotated.mp4');check('rotation metadata export');
  await page.locator('#theme').click();await page.screenshot({path:path.join(qa,'mobile-light.png'),fullPage:true});check('light theme');
