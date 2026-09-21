@@ -15,5 +15,5 @@ Desktop NiVedit is not modified or deployed by this repository.
 - Internal draft fields reuse V13 `clips/inP/outP/at/track/proj` meanings, but the phase-1 draft is NOT NVPROJ1. Desktop project round-trip is phase 2.
 
 First phase: one source clip, portrait/landscape UI, trim, undo/redo, original audio preview, 720p30 MP4 H.264/AAC export, cancel/retry, save/share, local draft, dark/light, Chinese/English, PWA shell, guide, diagnostics.
-Full V13 parity and real iPhone acceptance are pending. No feature has been removed from the final roadmap.
+On 2026-09-21, the user confirmed successful export and saving on a real iPhone, with correct picture and sound. Broader device/format testing and full V13 parity remain pending; see the phase-1 report for scope. No feature has been removed from the final roadmap.
 
