@@ -4,8 +4,14 @@ import {draft} from './storage.js';
 import {strings} from './i18n.js';
 const $=id=>document.getElementById(id),video=$('video');
 let lang=localStorage.getItem('iphone-language')||'zh';
-let project=null,file=null,meta=null,sourceUrl=null,worker=null,jobId=null,result=null,resultUrl=null,busy=false,importing=false,history=[],future=[],pendingTrim=null,saveTimer=null,saveQueue=Promise.resolve(),wakeLock=null,exportWatchdog=null;
+let project=null,file=null,meta=null,sourceUrl=null,worker=null,jobId=null,result=null,resultUrl=null,busy=false,importing=false,history=[],future=[],pendingTrim=null,saveTimer=null,saveQueue=Promise.resolve(),wakeLock=null,exportWatchdog=null,exportSequence=0;
 let diagnostic={version:VERSION,baseline:BASELINE,userAgent:navigator.userAgent,realIPhoneTest:'pending'};
+try{diagnostic.previousExportFailure=JSON.parse(localStorage.getItem('iphone-last-export-error')||'null');}catch{}
+function recordExportFailure(error){
+ const failure={version:VERSION,time:new Date().toISOString(),error:error?.message||String(error),attempt:diagnostic.lastAttempt,validation:diagnostic.outputValidation};
+ diagnostic.previousExportFailure=failure;
+ try{localStorage.setItem('iphone-last-export-error',JSON.stringify(failure));}catch{}
+}
 const t=k=>strings[lang]?.[k]||strings.zh[k]||k;
 const say=(key,detail='')=>$('status').textContent=t(key)+(detail?' '+detail:'');
 function errorText(e){const text=e?.message||String(e);diagnostic.lastError=text;if(/UNSUPPORTED|not supported|not defined/i.test(text))return t('noCodec');if(text.includes('MEMORY_LIMIT'))return t('memoryLimit');if(text.includes('TIMEOUT'))return t('timeout');return t('genericError')+' '+text;}
@@ -20,7 +26,7 @@ function c(){return project.clips[0];}
 function render(){
  const loaded=!!project;
  for(const id of ['play','rewind','seek','in','out','inRange','outRange','reset','saveDraft','export','previewLandscape','previewPortrait'])$(id).disabled=!loaded||importing||busy;
- $('undo').disabled=!history.length||!loaded;$('redo').disabled=!future.length||!loaded;
+ $('undo').disabled=!history.length||!loaded||importing||busy;$('redo').disabled=!future.length||!loaded||importing||busy;
  $('empty').hidden=loaded;
  $('outputChip').textContent=(loaded?Math.min(project.proj.w,project.proj.h):720)+'p · 30';
  $('screen').classList.toggle('has-media',loaded);
@@ -47,9 +53,9 @@ function renderPreviewSize(){
 }
 new ResizeObserver(renderPreviewSize).observe(document.querySelector('.viewer'));
 window.addEventListener('resize',renderPreviewSize);
-function updateTime(){if(!project)return;$('seek').value=Math.max(c().inP,Math.min(c().outP,video.currentTime));$('time').textContent=formatTime(video.currentTime-c().inP)+' / '+formatTime(c().outP-c().inP);}
+function updateTime(){if(!project||importing)return;const time=Math.max(c().inP,Math.min(c().outP,video.currentTime));$('seek').value=time;$('time').textContent=formatTime(time-c().inP)+' / '+formatTime(c().outP-c().inP);}
 function pause(){video.pause();$('play').textContent='▶';}
-video.addEventListener('timeupdate',()=>{if(project&&video.currentTime>=c().outP&&!video.paused){pause();video.currentTime=c().outP;}updateTime();});
+video.addEventListener('timeupdate',()=>{if(importing)return;if(project&&video.currentTime>=c().outP&&!video.paused){pause();video.currentTime=c().outP;}updateTime();});
 video.addEventListener('pause',()=>$('play').textContent='▶');video.addEventListener('play',()=>$('play').textContent='❚❚');
 $('play').onclick=async()=>{if(!project)return;if(!video.paused){pause();return;}if(video.currentTime>=c().outP-.03||video.currentTime<c().inP)video.currentTime=c().inP;try{await video.play();}catch(e){say('previewFailed');diagnostic.lastError=e.message;}};
 $('rewind').onclick=()=>{pause();video.currentTime=c().inP;};
@@ -63,6 +69,7 @@ async function saveDraft(){
 }
 function recordBefore(){const before=JSON.stringify(project);if(history.at(-1)!==before)history.push(before);if(history.length>60)history.shift();future=[];}
 function applyTrim(start,end,{record=true}={}){
+ if(busy||importing||!project)return;
  try{const copy=structuredClone(project);setTrim(copy,start,end,meta.duration);if(JSON.stringify(copy)===JSON.stringify(project)){render();return;}if(record)recordBefore();project=copy;releaseResult();pause();video.currentTime=Math.max(c().inP,Math.min(video.currentTime,c().outP));render();queueSave();}
  catch{say('invalidTrim');render();}
 }
@@ -72,8 +79,8 @@ for(const id of ['inRange','outRange']){
  $(id).addEventListener('change',()=>{if(pendingTrim){history.push(pendingTrim);future=[];pendingTrim=null;render();}});
 }
 $('reset').onclick=()=>applyTrim(0,meta.duration);
-$('undo').onclick=()=>{if(!history.length)return;future.push(JSON.stringify(project));project=JSON.parse(history.pop());releaseResult();pause();video.currentTime=c().inP;render();queueSave();};
-$('redo').onclick=()=>{if(!future.length)return;history.push(JSON.stringify(project));project=JSON.parse(future.pop());releaseResult();pause();video.currentTime=c().inP;render();queueSave();};
+$('undo').onclick=()=>{if(!history.length||importing||busy)return;future.push(JSON.stringify(project));project=JSON.parse(history.pop());releaseResult();pause();video.currentTime=c().inP;render();queueSave();};
+$('redo').onclick=()=>{if(!future.length||importing||busy)return;history.push(JSON.stringify(project));project=JSON.parse(future.pop());releaseResult();pause();video.currentTime=c().inP;render();queueSave();};
 async function importFile(next,saved=null){
  if(importing||busy)return;if(project&&!saved&&!confirm(t('replace')))return;
  importing=true;render();say(saved?'restoring':'loading');pause();
@@ -90,7 +97,7 @@ async function importFile(next,saved=null){
   if(saved){if(saved.schema!=='nivedit-iphone-draft-1')throw new Error('INVALID_DRAFT');setTrim(saved,saved.clips[0].inP,saved.clips[0].outP,duration);}
   await waitVideo(video,newUrl);
   if(sourceUrl)URL.revokeObjectURL(sourceUrl);sourceUrl=newUrl;newUrl=null;
-  await releaseResult();file=next;meta=newMeta;project=saved||makeProject(file,meta);history=[];future=[];
+  await releaseResult();file=next;meta=newMeta;project=saved||makeProject(file,meta);history=[];future=[];pendingTrim=null;
   video.currentTime=c().inP;$('restoreBox').hidden=true;render();say('ready');queueSave();
  }catch(e){if(newUrl)URL.revokeObjectURL(newUrl);if(sourceUrl&&video.src!==sourceUrl){video.src=sourceUrl;video.load();}say('importFailed',errorText(e));}
  finally{input?.dispose();importing=false;render();}
@@ -106,51 +113,66 @@ function changeAspect(aspect){if(busy||importing||!project)return;if(aspect===pr
 $('aspect').onchange=()=>changeAspect($('aspect').value);
 $('previewLandscape').onclick=()=>changeAspect('16:9');
 $('previewPortrait').onclick=()=>changeAspect('9:16');
-$('resolution').onchange=()=>{if(busy||!project)return;const value=+$('resolution').value;if(value===Math.min(project.proj.w,project.proj.h))return;recordBefore();setResolution(project,value);releaseResult();render();queueSave();$('exportStatus').textContent=t('foreground');};
+$('resolution').onchange=()=>{if(busy||importing||!project)return;const value=+$('resolution').value;if(value===Math.min(project.proj.w,project.proj.h))return;recordBefore();setResolution(project,value);releaseResult();render();queueSave();$('exportStatus').textContent=t('foreground');};
 function setBusy(value){$('aspect').disabled=value;$('resolution').disabled=value;if(!value)clearTimeout(exportWatchdog);busy=value;document.body.classList.toggle('busy',value);$('cancelExport').hidden=!value;$('closeExport').disabled=value;$('startExport').hidden=value;$('export').disabled=value||!project;}
-async function releaseResult(){if(resultUrl){$('resultVideo').pause();$('resultVideo').removeAttribute('src');$('resultVideo').load();URL.revokeObjectURL(resultUrl);}resultUrl=null;result=null;$('resultVideo').hidden=true;$('share').hidden=true;$('download').hidden=true;if(jobId){try{const root=await navigator.storage?.getDirectory();await root?.removeEntry(jobId);}catch{}jobId=null;}}
+async function releaseResult(){
+ // Detach the OLD file synchronously. Never consult shared jobId after awaiting.
+ const oldJobId=jobId;jobId=null;
+ if(resultUrl){$('resultVideo').pause();$('resultVideo').removeAttribute('src');$('resultVideo').load();URL.revokeObjectURL(resultUrl);}
+ resultUrl=null;result=null;$('resultVideo').hidden=true;$('share').hidden=true;$('download').hidden=true;
+ if(oldJobId)try{const root=await navigator.storage?.getDirectory();await root?.removeEntry(oldJobId);}catch{}
+}
 $('export').onclick=()=>{pause();renderExportSettings();$('exportStatus').textContent=result?t('done'):t('foreground');$('startExport').hidden=false;$('exportDialog').showModal();};
 async function stopExport(reason='cancelled'){
- if(!busy)return;worker?.terminate();worker=null;await releaseResult();wakeLock?.release().catch(()=>{});wakeLock=null;setBusy(false);$('exportStatus').textContent=t(reason);$('progress').value=0;
+ if(!busy)return;++exportSequence;worker?.terminate();worker=null;await releaseResult();wakeLock?.release().catch(()=>{});wakeLock=null;setBusy(false);$('exportStatus').textContent=t(reason);$('progress').value=0;
 }
 $('cancelExport').onclick=()=>stopExport();$('closeExport').onclick=()=>{$('resultVideo').pause();$('exportDialog').close();};
 $('exportDialog').addEventListener('cancel',e=>{if(busy)e.preventDefault();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){pause();if(busy)stopExport('background');}});
 $('startExport').onclick=async()=>{
- if(busy||!project)return;
- setBusy(true);await releaseResult();$('progress').value=0;$('exportStatus').textContent=t('prepare');
+ if(busy||importing||!project)return;
+ const sequence=++exportSequence;
+ const exportProject=structuredClone(project),exportFile=file,exportMeta={...meta};
+ const clip=exportProject.clips[0],settings=exportProject.proj;
+ diagnostic.lastAttempt={stage:'prepare',width:settings.w,height:settings.h,inP:clip.inP,outP:clip.outP,duration:clip.outP-clip.inP,sourceDuration:exportMeta.duration,sourceCodec:exportMeta.codec,audioCodec:exportMeta.audioCodec,sourceBytes:exportFile.size};
+ diagnostic.outputValidation=null;
+ setBusy(true);await releaseResult();
+ if(sequence!==exportSequence)return;
+ $('progress').value=0;$('exportStatus').textContent=t('prepare');
  try{
-  wakeLock=await navigator.wakeLock?.request('screen').catch(()=>null);
-  if(!busy)return;
+  const acquiredWakeLock=await navigator.wakeLock?.request('screen').catch(()=>null);
+  if(sequence!==exportSequence||!busy){await acquiredWakeLock?.release().catch(()=>{});return;}
+  wakeLock=acquiredWakeLock;
   jobId='nivedit-export-'+crypto.randomUUID()+'.mp4';
   worker=new Worker(new URL('./export-worker.js',import.meta.url),{type:'module'});
   const activeWorker=worker;
-  const fail=async e=>{if(worker!==activeWorker)return;activeWorker.terminate();worker=null;await releaseResult();setBusy(false);$('exportStatus').textContent=errorText(e);wakeLock?.release().catch(()=>{});wakeLock=null;};
+  const fail=async e=>{if(worker!==activeWorker||sequence!==exportSequence)return;++exportSequence;recordExportFailure(e);activeWorker.terminate();worker=null;await releaseResult();setBusy(false);$('exportStatus').textContent=errorText(e);wakeLock?.release().catch(()=>{});wakeLock=null;};
   const touchWatchdog=()=>{clearTimeout(exportWatchdog);exportWatchdog=setTimeout(()=>fail(new Error('TIMEOUT')),120000);};
   touchWatchdog();activeWorker.onerror=e=>fail(new Error(e.message));
   activeWorker.onmessage=async({data})=>{
-   if(worker!==activeWorker)return;touchWatchdog();
-   if(data.type==='stage'){$('exportStatus').textContent=t(data.stage);diagnostic.exportStorage=data.storage;}
+   if(worker!==activeWorker||sequence!==exportSequence)return;touchWatchdog();
+   if(data.type==='stage'){diagnostic.lastAttempt.stage=data.stage;$('exportStatus').textContent=t(data.stage);diagnostic.exportStorage=data.storage;}
    if(data.type==='progress'){$('progress').value=data.value;$('exportStatus').textContent=t('encode')+' '+Math.round(data.value*100)+'%';}
    if(data.type==='error'){await fail(new Error(data.message));return;}
    if(data.type==='done'){
-    $('exportStatus').textContent=t('verify');let check;
+    diagnostic.lastAttempt.stage='verify';$('exportStatus').textContent=t('verify');let check;
     try{
      check=new Input({source:new BlobSource(data.blob),formats:ALL_FORMATS});
      const v=await check.getPrimaryVideoTrack(),a=await check.getPrimaryAudioTrack(),d=await check.computeDuration();
-     if(worker!==activeWorker)return;
-     if(!v||v.displayWidth!==project.proj.w||v.displayHeight!==project.proj.h||(meta.hasAudio&&!a)||Math.abs(d-(c().outP-c().inP))>.25)throw new Error('OUTPUT_VALIDATION_FAILED');
+     if(worker!==activeWorker||sequence!==exportSequence)return;
+     diagnostic.outputValidation={width:v?.displayWidth,height:v?.displayHeight,duration:d,video:v?.codec,audio:a?.codec};
+     if(!v||v.displayWidth!==settings.w||v.displayHeight!==settings.h||(exportMeta.hasAudio&&!a)||Math.abs(d-(clip.outP-clip.inP))>.25)throw new Error('OUTPUT_VALIDATION_FAILED');
      result=new File([data.blob],'NiVedit-iPhone-'+new Date().toISOString().replace(/[:.]/g,'-')+'.mp4',{type:'video/mp4'});
      resultUrl=URL.createObjectURL(result);await waitVideo($('resultVideo'),resultUrl);
-     if(worker!==activeWorker)return;
+     if(worker!==activeWorker||sequence!==exportSequence)return;
      $('resultVideo').hidden=false;$('download').href=resultUrl;$('download').download=result.name;$('download').hidden=false;$('share').hidden=false;
-     $('progress').value=1;$('exportStatus').textContent=t('done');diagnostic.lastOutput={bytes:result.size,duration:d,video:v.codec,audio:a?.codec||null,width:v.displayWidth,height:v.displayHeight,storage:data.storage};
+     diagnostic.lastAttempt.stage='done';$('progress').value=1;$('exportStatus').textContent=t('done');diagnostic.lastOutput={bytes:result.size,duration:d,video:v.codec,audio:a?.codec||null,width:v.displayWidth,height:v.displayHeight,storage:data.storage};
      activeWorker.terminate();worker=null;setBusy(false);wakeLock?.release().catch(()=>{});wakeLock=null;
     }catch(e){await fail(e);}finally{check?.dispose();}
    }
   };
-  activeWorker.postMessage({file,project:structuredClone(project),jobId});
- }catch(e){await stopExport();$('exportStatus').textContent=errorText(e);}
+  activeWorker.postMessage({file:exportFile,project:exportProject,jobId});
+ }catch(e){if(sequence!==exportSequence)return;recordExportFailure(e);await stopExport();$('exportStatus').textContent=errorText(e);}
 };
 $('share').onclick=async()=>{if(!result)return;if(!navigator.canShare?.({files:[result]})){$('exportStatus').textContent=t('shareUnavailable');return;}try{await navigator.share({files:[result],title:'NiVedit'});$('exportStatus').textContent=t('shared');}catch(e){$('exportStatus').textContent=e.name==='AbortError'?t('shareCancelled'):errorText(e);}};
 $('download').onclick=()=>$('exportStatus').textContent=t('downloaded');

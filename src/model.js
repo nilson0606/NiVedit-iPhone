@@ -1,7 +1,7 @@
 // V13 semantics: source inP/outP, timeline at, track, proj dimensions.
 // Phase 1 has a single clip. NVPROJ1 import/export is a phase 2 gate.
 export const BASELINE = '1e73b55ea388e6b9f1c7925f0651846cdb8f20c0';
-export const VERSION = '0.1.4';
+export const VERSION = '0.1.5';
 export function makeProject(file, meta) {
  return {schema:'nivedit-iphone-draft-1',baseline:BASELINE,clips:[{id:crypto.randomUUID(),name:file.name,kind:'video',track:0,at:0,inP:0,outP:meta.duration,vol:1,mute:false}],titles:[],musics:[],overlays:[],subs:[],proj:{aspect:meta.width<meta.height?'9:16':'16:9',w:meta.width<meta.height?720:1280,h:meta.width<meta.height?1280:720,fps:30,bitrate:4,fit:'contain',tracks:['video','img','over','title','music']}};
 }
@@ -10,7 +10,7 @@ export function setTrim(project,start,end,duration) {
  project.clips[0].inP=start; project.clips[0].outP=Math.min(end,duration);
  return project;
 }
-export function formatTime(n){n=Math.max(0,Number(n)||0);return String(Math.floor(n/60)).padStart(2,'0')+':'+(n%60).toFixed(1).padStart(4,'0');}
+export function formatTime(n){const value=Number(n);const ticks=Math.round(Math.max(0,Number.isFinite(value)?value:0)*10);return String(Math.floor(ticks/600)).padStart(2,'0')+':'+((ticks%600)/10).toFixed(1).padStart(4,'0');}
 
 export function setResolution(project, resolution) {
  if (![720,1080].includes(resolution)) throw new Error('INVALID_RESOLUTION');

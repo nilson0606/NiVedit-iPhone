@@ -1,6 +1,7 @@
 const {chromium}=require('playwright');
 const http=require('http'),fs=require('fs'),path=require('path'),assert=require('assert/strict'),{execFileSync}=require('child_process');
 const root=path.resolve(__dirname,'..'),qa=path.join(root,'qa'),prefix='/NiVedit-iPhone/';
+const currentVersion=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')).version;
 let latest=false,corrupt=false;const oldFiles=new Map(),requests=[];
 const server=http.createServer((req,res)=>{
  const url=new URL(req.url,'http://127.0.0.1'),name=decodeURIComponent(url.pathname).slice(prefix.length)||'index.html';
@@ -36,19 +37,19 @@ const server=http.createServer((req,res)=>{
   const updater=await context.newPage();await updater.goto(url+'update.html');
   assert.match(await page.locator('.badge').textContent(),/0.1.2/);
   await updater.locator('#update').click();
-  await updater.waitForURL(/updated=0\.1\.4/,{timeout:90000});
+  await updater.waitForURL(url=>url.searchParams.get('updated')===currentVersion,{timeout:90000});
   await updater.waitForFunction(()=>!!document.querySelector('#importHero').onclick);
-  assert.match(await updater.locator('.badge').textContent(),/0.1.4/);pass('explicit recovery upgrades while old app tab remains open');
+  assert.ok((await updater.locator('.badge').textContent()).includes(currentVersion));pass('explicit recovery upgrades while old app tab remains open');
   const savedAfter=await updater.evaluate(async()=>{const {draft}=await import('./src/storage.js');const d=await draft('get');return {size:d.file.size,project:d.project,bytes:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await d.file.arrayBuffer())))};});
   assert.deepEqual(savedAfter,saved);pass('draft values and original media bytes unchanged');
   await updater.locator('#restore').click();await updater.waitForFunction(()=>!document.querySelector('#export').disabled);
   assert.equal(await updater.locator('#in').inputValue(),'1.00');
   await updater.locator('#previewPortrait').click();assert.equal(await updater.locator('#previewPortrait').getAttribute('aria-pressed'),'true');pass('restored draft editable with new preview controls');
-  assert.ok(requests.some(r=>r.latest&&r.name==='src/app.js'&&r.query.includes('__nivedit_release=0.1.4')));pass('new assets bypass previous HTTP cache');
+  assert.ok(requests.some(r=>r.latest&&r.name==='src/app.js'&&r.query.includes('__nivedit_release='+currentVersion)));pass('new assets bypass previous HTTP cache');
   // Latest shell and restored draft must continue to work offline.
   await updater.locator('#saveDraft').click();await updater.waitForFunction(()=>document.querySelector('#draftState').textContent.includes('已儲存'));
   await context.setOffline(true);await updater.reload();await updater.waitForFunction(()=>!!document.querySelector('#importHero').onclick);
-  assert.match(await updater.locator('.badge').textContent(),/0.1.4/);await updater.locator('#restore').click();await updater.waitForFunction(()=>!document.querySelector('#export').disabled);pass('updated app and draft restore offline');
+  assert.ok((await updater.locator('.badge').textContent()).includes(currentVersion));await updater.locator('#restore').click();await updater.waitForFunction(()=>!document.querySelector('#export').disabled);pass('updated app and draft restore offline');
   await context.setOffline(false);await page.close();await updater.close();
   // A mixed release must never activate.
   const isolated=await browser.newContext(),bad=await isolated.newPage();corrupt=true;
