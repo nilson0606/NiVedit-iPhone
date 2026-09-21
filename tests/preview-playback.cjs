@@ -46,13 +46,13 @@ const server=http.createServer((req,res)=>{const name=decodeURIComponent(new URL
 
   // Slow seeks must retain a complete old frame until the requested one is ready.
   const delayed=await page.evaluate(async()=>{
-   const {CanvasSink}=await import('./vendor/mediabunny.mjs'),get=CanvasSink.prototype.getCanvas;
-   CanvasSink.prototype.getCanvas=async function(...args){await new Promise(r=>setTimeout(r,110));return get.apply(this,args);};
+   const {PreviewDecoder}=await import('./src/preview-decoder.js'),get=PreviewDecoder.prototype.request;
+   PreviewDecoder.prototype.request=async function(...args){const result=await get.apply(this,args);if(args[0]==='frame')await new Promise(r=>setTimeout(r,110));return result;};
    const means=[];let observing=true;
    const sample=()=>{const c=document.querySelector('#canvas'),d=c.getContext('2d').getImageData(c.width/2,c.height/2,1,1).data;means.push(d[0]+d[1]+d[2]);if(observing)requestAnimationFrame(sample);};sample();
    const seek=t=>{const e=document.querySelector('#seek');e.value=t;e.dispatchEvent(new Event('input'));};
    seek(.5);await new Promise(r=>setTimeout(r,15));seek(2.4);
-   await new Promise(r=>setTimeout(r,400));observing=false;CanvasSink.prototype.getCanvas=get;
+   await new Promise(r=>setTimeout(r,400));observing=false;PreviewDecoder.prototype.request=get;
    return {minimum:Math.min(...means),position:Number(document.querySelector('#seek').value),rms:window.rms()};
   });
   assert.ok(delayed.minimum>20);assert.equal(delayed.position,2.4);assert.ok(delayed.rms<.0001);pass('slow decode and rapid seeking retain complete frame; stale seeks stay silent',delayed);

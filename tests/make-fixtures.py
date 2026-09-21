@@ -16,3 +16,6 @@ print(root)
 from PIL import Image, ImageDraw
 for name,color in [('overlay.png',(255,70,30,255)),('overlay2.png',(20,240,60,255))]:
  im=Image.new('RGBA',(320,180),(0,0,0,0));ImageDraw.Draw(im).rectangle((110,50,210,130),fill=color);im.save(root/name)
+
+# Complete-playback stress fixture, including high frame rate and B-frames.
+run(['-f','lavfi','-i','testsrc2=size=1920x1080:rate=60:duration=13','-f','lavfi','-i','sine=frequency=440:sample_rate=48000:duration=13','-c:v','libx264','-preset','veryfast','-crf','26','-g','120','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-shortest',str(root/'preview-13s-1080p60.mp4')])

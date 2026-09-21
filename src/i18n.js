@@ -8,3 +8,6 @@ for(const lang of Object.keys(phase2))Object.assign(strings[lang],phase2[lang]);
 
 Object.assign(strings.zh,{checkUpdate:'儲存專案並更新',recoveredCopy:'先前草稿復原副本',legacyRecovered:'先前草稿已保留為復原副本，請從「專案」清單開啟。',unsavedChanges:'有未儲存變更',projectSaved:'專案已儲存',projectStorageHint:'請用儲存專案保留修改；不會自動儲存。',newConfirm:'建立新專案？請先儲存要保留的修改。'});
 Object.assign(strings.en,{checkUpdate:'Save project and update',recoveredCopy:'Recovered previous draft',legacyRecovered:'The previous draft was recovered to the Projects list.',unsavedChanges:'Unsaved changes',projectSaved:'Project saved',projectStorageHint:'Use Save project to keep changes. No autosave.',newConfirm:'Create a new project? Save changes you want to keep first.'});
+
+Object.assign(strings.zh,{previewTimeout:'預覽暫時沒有回應，已停止播放。請再按播放重試。'});
+Object.assign(strings.en,{previewTimeout:'Preview stopped responding and has been stopped. Press Play to retry.'});

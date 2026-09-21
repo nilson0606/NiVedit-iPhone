@@ -1,5 +1,5 @@
 // V13 timing semantics. Unknown desktop fields are retained on import.
-export const BASELINE='1e73b55ea388e6b9f1c7925f0651846cdb8f20c0',VERSION='0.2.1';
+export const BASELINE='1e73b55ea388e6b9f1c7925f0651846cdb8f20c0',VERSION='0.2.2';
 export function makeProject(file,meta){return {schema:'nivedit-iphone-draft-1',baseline:BASELINE,clips:[{id:crypto.randomUUID(),name:file.name,kind:'video',track:0,at:0,inP:0,outP:meta.duration,vol:1,muted:false}],titles:[],musics:[],overlays:[],subs:[],proj:{aspect:meta.width<meta.height?'9:16':'16:9',w:meta.width<meta.height?720:1280,h:meta.width<meta.height?1280:720,fps:30,bitrate:4,fit:'contain',tracks:['video','img','over','title','music']}};}
 export function setTrim(p,start,end,duration){if(![start,end,duration].every(Number.isFinite)||start<0||end>duration+.001||end-start<.1)throw Error('INVALID_TRIM');p.clips[0].inP=start;p.clips[0].outP=Math.min(end,duration);return p;}
 export function formatTime(n){const v=Number(n),ticks=Math.round(Math.max(0,Number.isFinite(v)?v:0)*10);return String(Math.floor(ticks/600)).padStart(2,'0')+':'+((ticks%600)/10).toFixed(1).padStart(4,'0');}

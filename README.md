@@ -1,12 +1,12 @@
 # NiVedit iPhone
 
-Independent iPhone Web App, desktop V13 semantics. **0.2.1, phase 2 preview.**
+Independent iPhone Web App, desktop V13 semantics. **0.2.2, phase 2 preview.**
 Desktop NiVedit and its restore points are unchanged.
 
 - Site: https://nilson0606.github.io/NiVedit-iPhone/
 - Baseline: nilson0606/NiVedit V13 at 1e73b55ea388e6b9f1c7925f0651846cdb8f20c0.
 - Plan: [To_IPhone.md](docs/To_IPhone.md).
-- Current fix: [preview-0.2.1.md](docs/preview-0.2.1.md); phase 2: [phase-2.md](docs/phase-2.md); historical [phase-1.md](docs/phase-1.md).
+- Current fix: [preview-0.2.2.md](docs/preview-0.2.2.md); phase 2: [phase-2.md](docs/phase-2.md); historical [phase-1.md](docs/phase-1.md).
 - Guide: [manual.html](manual.html).
 - Local: python -m http.server 8093 --bind 127.0.0.1. Use HTTPS/localhost, not file://.
 - Dependency: vendored unmodified Mediabunny 1.58.1 (MPL-2.0); see THIRD_PARTY.md. No runtime CDN.
@@ -30,4 +30,6 @@ Rebuild example: python scripts/make-example.py --ffmpeg /path/to/ffmpeg.
 
 After app edits, update package/model/SW/UI version and run python scripts/release.py. All precached assets are SHA-256 pinned; mixed releases cannot install. update.html activates only after a user click, preserving named projects and OPFS data.
 
-Preview playback: node tests/preview-playback.cjs measures the actual Web Audio output graph, overlaps/mute/pause, slow decode and black-frame continuity. Preview uses sequential CanvasSink decoding and bounded AudioBufferSink scheduling, not hidden HTML media playback.
+Preview playback: node tests/preview-playback.cjs measures the actual Web Audio output graph, overlaps/mute/pause, slow decode and black-frame continuity. Preview decodes video/audio in a disposable worker, renders each selected frame once, and schedules bounded PCM audio on the UI thread.
+
+Playback stress: node tests/preview-stress.cjs (13s 1080p60, five complete plays, 4x UI CPU throttle, repeat pause/seek, forced worker hangs). PREVIEW_BASELINE=ba9102c runs the previous build for comparison. The prior build also plays smoothly on this PC: the reported iPhone stutter remains unconfirmed pending real-device testing. The user declined to provide the source clip; use generic fixtures rather than clip-specific tuning.
