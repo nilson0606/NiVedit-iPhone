@@ -42,14 +42,15 @@ const server=http.createServer((req,res)=>{
   assert.ok((await updater.locator('.badge').textContent()).includes(currentVersion));pass('explicit recovery upgrades while old app tab remains open');
   const savedAfter=await updater.evaluate(async()=>{const {draft}=await import('./src/storage.js');const d=await draft('get');return {size:d.file.size,project:d.project,bytes:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await d.file.arrayBuffer())))};});
   assert.deepEqual(savedAfter,saved);pass('draft values and original media bytes unchanged');
-  await updater.locator('#restore').click();await updater.waitForFunction(()=>!document.querySelector('#export').disabled);
+  await updater.locator('#projectMenu').click();await updater.locator('.project-row').first().getByRole('button',{name:'開啟',exact:true}).click();await updater.waitForFunction(()=>!document.querySelector('#export').disabled);
   assert.equal(await updater.locator('#in').inputValue(),'1.00');
-  await updater.locator('#previewPortrait').click();assert.equal(await updater.locator('#previewPortrait').getAttribute('aria-pressed'),'true');pass('restored draft editable with new preview controls');
+  assert.equal(await updater.locator('#saveDraft').count(),0);assert.equal(await updater.locator('#restore').count(),0);pass('draft UI removed; old draft copied safely to project list');
+  await updater.locator('#previewPortrait').click();assert.equal(await updater.locator('#previewPortrait').getAttribute('aria-pressed'),'true');pass('legacy draft recovered as named project and editable');
   assert.ok(requests.some(r=>r.latest&&r.name==='src/app.js'&&r.query.includes('__nivedit_release='+currentVersion)));pass('new assets bypass previous HTTP cache');
   // Latest shell and restored draft must continue to work offline.
-  await updater.locator('#saveDraft').click();await updater.waitForFunction(()=>document.querySelector('#draftState').textContent.includes('已儲存'));
+  await updater.locator('#saveProjectQuick').click();await updater.waitForFunction(()=>document.querySelector('#saveState').textContent.includes('已儲存'));
   await context.setOffline(true);await updater.reload();await updater.waitForFunction(()=>!!document.querySelector('#importHero').onclick);
-  assert.ok((await updater.locator('.badge').textContent()).includes(currentVersion));await updater.locator('#restore').click();await updater.waitForFunction(()=>!document.querySelector('#export').disabled);pass('updated app and draft restore offline');
+  assert.ok((await updater.locator('.badge').textContent()).includes(currentVersion));await updater.locator('#projectMenu').click();await updater.locator('.project-row').first().getByRole('button',{name:'開啟',exact:true}).click();await updater.waitForFunction(()=>!document.querySelector('#export').disabled);pass('updated app and recovered project reopen offline');
   await context.setOffline(false);await page.close();await updater.close();
   // A mixed release must never activate.
   const isolated=await browser.newContext(),bad=await isolated.newPage();corrupt=true;

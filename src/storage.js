@@ -3,3 +3,25 @@ function open(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,
 async function request(store,action,key,value){const db=await open();try{return await new Promise((resolve,reject)=>{const tx=db.transaction(store,action==='get'||action==='list'?'readonly':'readwrite'),s=tx.objectStore(store);const req=action==='list'?s.getAll():action==='get'?s.get(key):action==='put'?s.put(value,key):s.delete(key);let result;req.onsuccess=()=>result=req.result;tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('Storage aborted'));});}finally{db.close();}}
 export const draft=(action,value)=>request('drafts',action,'current',value);
 export const projects=(action,id,value)=>request('projects',action,id,value);
+
+// One-time, atomic migration only. The old record remains intact; no new drafts are written.
+export async function recoverLegacyDraft(label){
+ const db=await open();
+ try{return await new Promise((resolve,reject)=>{
+  const tx=db.transaction(['drafts','projects'],'readwrite'),legacy=tx.objectStore('drafts'),library=tx.objectStore('projects');let recovered=false;
+  const marker=legacy.get('migrated-to-projects-0.2.1');
+  marker.onsuccess=()=>{
+   if(marker.result)return;
+   const request=legacy.get('current');
+   request.onsuccess=()=>{
+    const value=request.result;
+    if(value?.project){
+     const id='legacy-recovery-'+crypto.randomUUID();
+     library.put({...value,id,savedId:id,name:(value.name?value.name+' · ':'')+label,dirty:false,example:false,savedAt:Date.now()},id);recovered=true;
+    }
+    legacy.put(true,'migrated-to-projects-0.2.1');
+   };
+  };
+  tx.oncomplete=()=>resolve(recovered);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('Recovery aborted'));
+ });}finally{db.close();}
+}

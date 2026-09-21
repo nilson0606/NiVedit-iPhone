@@ -11,7 +11,7 @@ const server=http.createServer((req,res)=>{
  await new Promise(r=>server.listen(8093,'127.0.0.1',r));
  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true,args:['--autoplay-policy=no-user-gesture-required']});
  const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true,deviceScaleFactor:1,acceptDownloads:true});
- const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+ const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept(d.type()==='prompt'?'Browser regression':undefined));
  const reports=[];const check=(name,detail)=>{reports.push({name,detail});console.log('PASS',name,JSON.stringify(detail||''));};
  try{
  await page.goto(process.env.BASE_URL||'http://127.0.0.1:8093/');await page.waitForFunction(()=>!!document.querySelector('#importHero').onclick);
@@ -24,15 +24,15 @@ const server=http.createServer((req,res)=>{
  assert.equal(await page.locator('#duration').textContent(),'4.00 s');check('trim 1–5 seconds');
  await page.locator('#undo').click();assert.notEqual(await page.locator('#duration').textContent(),'4.00 s');
  await page.locator('#redo').click();assert.equal(await page.locator('#duration').textContent(),'4.00 s');check('undo / redo');
- await page.locator('#play').click();await page.waitForFunction(()=>document.querySelector('#video').currentTime>1.15);await page.locator('#play').click();check('preview plays original audio',await page.locator('#audioInfo').textContent());
- await page.locator('#saveDraft').click();await page.waitForFunction(()=>document.querySelector('#draftState').textContent.includes('已儲存'));
- await page.reload();await page.locator('#restore').waitFor({state:'visible'});await page.locator('#restore').click();
+ await page.locator('#play').click();await page.waitForFunction(()=>Number(document.querySelector('#seek').value)>.15);await page.locator('#play').click();check('preview playback advances',await page.locator('#audioInfo').textContent());
+ await page.locator('#saveProjectQuick').click();await page.waitForFunction(()=>document.querySelector('#saveState').textContent.includes('已儲存'));
+ await page.reload();await page.locator('#projectMenu').click();await page.locator('.project-row').first().getByRole('button',{name:'開啟',exact:true}).click();
  await page.waitForFunction(()=>!document.querySelector('#export').disabled);
- assert.equal(await page.locator('#duration').textContent(),'4.00 s');check('draft survives reload with original media');
- await page.waitForFunction(()=>{const v=document.querySelector('#video');return !v.seeking&&v.readyState>=2;});
+ assert.equal(await page.locator('#duration').textContent(),'4.00 s');check('saved project survives reload with original media');
+ await page.waitForFunction(()=>{return !!document.querySelector('#canvas').dataset.frameReady;});
  await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
  await page.screenshot({path:path.join(qa,'mobile-editor.png'),fullPage:true});
- const previewMean=await page.evaluate(()=>{const v=document.querySelector('#video'),c=document.createElement('canvas');c.width=c.height=32;const x=c.getContext('2d');x.drawImage(v,0,0,32,32);const a=x.getImageData(0,0,32,32).data;let sum=0;for(let i=0;i<a.length;i+=4)sum+=a[i]+a[i+1]+a[i+2];return sum/(32*32*3);});assert.ok(previewMean>20);check('restored preview has decoded pixels',previewMean);
+ const previewMean=await page.evaluate(()=>{const v=document.querySelector('#canvas'),c=document.createElement('canvas');c.width=c.height=32;const x=c.getContext('2d');x.drawImage(v,0,0,32,32);const a=x.getImageData(0,0,32,32).data;let sum=0;for(let i=0;i<a.length;i+=4)sum+=a[i]+a[i+1]+a[i+2];return sum/(32*32*3);});assert.ok(previewMean>20);check('restored preview has decoded pixels',previewMean);
  await page.locator('#previewPortrait').click();
  assert.equal(await page.locator('#exportDialog').isVisible(),false);
  assert.equal(await page.locator('#previewPortrait').getAttribute('aria-pressed'),'true');
@@ -67,10 +67,10 @@ const server=http.createServer((req,res)=>{
  await page.locator('#redo').click();box=await page.locator('#canvas').boundingBox();assert.ok(Math.abs(box.width/box.height-9/16)<.01);check('orientation undo / redo');
 
  assert.equal(await page.locator('#outputChip').textContent(),'1080p · 30');
- await page.locator('#saveDraft').click();await page.waitForFunction(()=>document.querySelector('#draftState').textContent.includes('已儲存'));
- await page.reload();await page.locator('#restore').click();await page.waitForFunction(()=>!document.querySelector('#export').disabled);
- assert.equal(await page.locator('#outputChip').textContent(),'1080p · 30');check('1080p setting survives draft reload');
- await page.locator('#export').click();assert.equal(await page.locator('#resolution').inputValue(),'1080');assert.equal(await page.locator('#aspect').inputValue(),'9:16');check('orientation survives draft restore');
+ await page.locator('#saveProjectQuick').click();await page.waitForFunction(()=>document.querySelector('#saveState').textContent.includes('已儲存'));
+ await page.reload();await page.locator('#projectMenu').click();await page.locator('.project-row').first().getByRole('button',{name:'開啟',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('#export').disabled);
+ assert.equal(await page.locator('#outputChip').textContent(),'1080p · 30');check('1080p setting survives project reload');
+ await page.locator('#export').click();assert.equal(await page.locator('#resolution').inputValue(),'1080');assert.equal(await page.locator('#aspect').inputValue(),'9:16');check('orientation survives project reopen');
  await page.locator('#resolution').selectOption('720');await page.locator('#closeExport').click();
  await page.locator('#undo').click();assert.equal(await page.locator('#outputChip').textContent(),'1080p · 30');
  await page.locator('#redo').click();assert.equal(await page.locator('#outputChip').textContent(),'720p · 30');check('resolution undo / redo');

@@ -1,13 +1,13 @@
 import {Input,BlobSource,ALL_FORMATS,canEncodeVideo,canEncodeAudio} from '../vendor/mediabunny.mjs';
 import {makeProject,setResolution,setAspect,formatTime,VERSION,BASELINE,addClip,layout,totalDuration,clipTrack,clipDuration,moveClip,trimClip,splitClip,projectLimitations} from './model.js';
-import {draft,projects} from './storage.js';
+import {projects,recoverLegacyDraft} from './storage.js';
 import {readProject,writeProject} from './project-file.js';
 import {inspectMedia,Preview} from './media.js';
 import {strings} from './i18n.js';
 const $=id=>document.getElementById(id);
 let lang=localStorage.getItem('iphone-language')||'zh';
 let project=null,media=new Map(),metas=new Map(),selected=null,name='',savedId=null,originalHeader={},example=false,dirty=false;
-let file=null,meta=null,worker=null,jobId=null,result=null,resultUrl=null,busy=false,importing=false,history=[],future=[],pendingTrim=null,saveTimer=null,saveQueue=Promise.resolve(),wakeLock=null,exportWatchdog=null,exportSequence=0,projectDownloadUrl=null,projectDownloadFile=null,repairKey=null;
+let file=null,meta=null,worker=null,jobId=null,result=null,resultUrl=null,busy=false,importing=false,history=[],future=[],pendingTrim=null,wakeLock=null,exportWatchdog=null,exportSequence=0,projectDownloadUrl=null,projectDownloadFile=null,repairKey=null;
 let diagnostic={version:VERSION,baseline:BASELINE,userAgent:navigator.userAgent,realIPhoneTest:'pending',knownIssue:'Intermittent iPhone export failure remains open; deferred by user.'};
 try{diagnostic.previousExportFailure=JSON.parse(localStorage.getItem('iphone-last-export-error')||'null');}catch{}
 function recordExportFailure(error){const failure={version:VERSION,time:new Date().toISOString(),error:error?.message||String(error),attempt:diagnostic.lastAttempt,validation:diagnostic.outputValidation};diagnostic.previousExportFailure=failure;try{localStorage.setItem('iphone-last-export-error',JSON.stringify(failure));}catch{}}
@@ -16,7 +16,7 @@ const say=(key,detail='')=>$('status').textContent=t(key)+(detail?' '+detail:'')
 function errorText(e){const text=e?.message||String(e);diagnostic.lastError=text;const key={TRACK_OVERLAP:'overlapError',SPLIT_POSITION:'splitError',SPLIT_ADVANCED:'splitAdvanced',INVALID_TRIM:'invalidTrim',GIF_LATER:'gifLater',UNSUPPORTED_PROJECT_FEATURES:'limitedExport'}[text];if(key)return t(key);if(/UNSUPPORTED|not supported|not defined/i.test(text))return t('noCodec');if(text.includes('MEMORY_LIMIT'))return t('memoryLimit');if(text.includes('TIMEOUT'))return t('timeout');return t('genericError')+' '+text;}
 const timeout=(promise,ms=30000)=>{let id;return Promise.race([promise,new Promise((_,r)=>id=setTimeout(()=>r(Error('TIMEOUT')),ms))]).finally(()=>clearTimeout(id));};
 function waitVideo(el,src){return new Promise((resolve,reject)=>{const timer=setTimeout(()=>finish(Error('TIMEOUT')),30000);const finish=e=>{clearTimeout(timer);el.removeEventListener('loadeddata',loaded);el.removeEventListener('error',failed);e?reject(e):resolve();};const loaded=()=>finish();const failed=()=>finish(Error('VIDEO_DECODE_UNSUPPORTED'));el.addEventListener('loadeddata',loaded);el.addEventListener('error',failed);el.src=src;el.load();});}
-const preview=new Preview($('canvas'),updateTime,e=>say('previewFailed',e.message));
+const preview=new Preview($('canvas'),updateTime,e=>{diagnostic.previewError={time:new Date().toISOString(),message:e.message};say('previewFailed',e.message);});
 function c(){return project?.clips.find(c=>c.id===selected)||null;}
 function pause(){preview.pause();$('play').textContent='▶';}
 function translate(){document.documentElement.lang=lang==='zh'?'zh-Hant':'en';document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));$('language').textContent=lang==='zh'?'EN':'繁';render();}
@@ -28,7 +28,7 @@ new ResizeObserver(renderPreviewSize).observe(document.querySelector('.viewer'))
 function missing(){return project?.clips.filter(c=>!media.has(c.mediaKey)||!metas.has(c.mediaKey))||[];}
 function render(){
  const loaded=!!project,clip=c(),locked=busy||importing;file=clip?media.get(clip.mediaKey):null;meta=clip?metas.get(clip.mediaKey):null;
- for(const id of ['play','rewind','seek','saveDraft','export','previewLandscape','previewPortrait','saveProject','saveAs','prepareProjectFile'])$(id).disabled=!loaded||locked;
+ for(const id of ['play','rewind','seek','saveProjectQuick','export','previewLandscape','previewPortrait','saveProject','saveAs','prepareProjectFile'])$(id).disabled=!loaded||locked;
  for(const id of ['in','out','inRange','outRange','reset','clipAt','clipTrack','moveNow','attachPrevious','split','deleteClip','muted','volume','repairMedia'])$(id).disabled=!clip||locked;
  $('undo').disabled=!history.length||locked;$('redo').disabled=!future.length||locked;
  for(const id of ['importHero','importBottom','projectMenu','newProject','openProjectFile','openExample'])$(id).disabled=locked;
@@ -52,19 +52,15 @@ function render(){
   }
   renderExportSettings();
  }
- renderPreviewSize();renderTimeline();updateTime(preview.time,preview.playing);
+ renderPreviewSize();renderTimeline();updateTime(preview.time,preview.playing);updateSaveState();
 }
 function updateTime(time=0,playing=false){const total=project?totalDuration(project):0;$('seek').value=time;$('time').textContent=formatTime(time)+' / '+formatTime(total);$('play').textContent=playing?'❚❚':'▶';const head=$('playhead');if(head)head.style.left=time*+$('zoom').value+'px';}
-$('play').onclick=()=>preview.playing?pause():preview.play().catch(e=>say('previewFailed',e.message));
+$('play').onclick=()=>preview.playing||preview.starting?pause():preview.play().catch(e=>say('previewFailed',e.message));
 $('rewind').onclick=()=>preview.seek(0);$('seek').oninput=()=>preview.seek(+$('seek').value);
 function snapshot(){return {project:structuredClone(project),media:[...media],metas:[...metas],selected,name,savedId,originalHeader:structuredClone(originalHeader),example,dirty,playhead:preview.time,savedAt:Date.now()};}
-function queueSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveDraft,500);}
-async function saveDraft(){
- if(!project)return true;const value=snapshot();saveQueue=saveQueue.catch(()=>{}).then(()=>draft('put',value));
- try{await saveQueue;$('draftState').textContent=t('saved');return true;}catch(e){$('draftState').textContent=t('saveFailed');diagnostic.storageError=e.message;return false;}
-}
+function updateSaveState(){$('saveState').textContent=t(project?(dirty?'unsavedChanges':'projectSaved'):'projectStorageHint');}
 function invalidateProjectFile(){if(projectDownloadUrl)URL.revokeObjectURL(projectDownloadUrl);projectDownloadUrl=null;projectDownloadFile=null;$('downloadProject').hidden=$('shareProject').hidden=true;}
-function changed(){dirty=true;invalidateProjectFile();releaseResult();preview.setProject(project,media);render();queueSave();}
+function changed(){dirty=true;invalidateProjectFile();releaseResult();preview.setProject(project,media);render();updateSaveState();}
 function recordBefore(){history.push(JSON.stringify(project));if(history.length>60)history.shift();future=[];}
 function edit(fn,record=true){
  if(busy||importing||!project)return;const next=structuredClone(project);
@@ -128,7 +124,7 @@ async function importFiles(files){
   const prepared=[];for(const f of files)prepared.push({file:f,meta:await timeout(inspectMedia(f),45000)});
   if(project)recordBefore();else{project=makeProject(prepared[0].file,prepared[0].meta);project.clips=[];name=t('untitled');savedId=null;originalHeader={};example=false;history=[];future=[];}
   for(const r of prepared){const clip=addClip(project,r.file,r.meta,+$('addTrack').value);media.set(clip.mediaKey,r.file);metas.set(clip.mediaKey,r.meta);selected=clip.id;}
-  pendingTrim=null;changed();preview.seek(layout(project).find(q=>q.clip.id===selected).at);$('restoreBox').hidden=true;say('ready');
+  pendingTrim=null;changed();preview.seek(layout(project).find(q=>q.clip.id===selected).at);say('ready');
  }catch(e){say('importFailed',errorText(e));}finally{importing=false;render();}
 }
 for(const id of ['importHero','importBottom'])$(id).onclick=()=>{if(!busy&&!importing)$('file').click();};
@@ -143,26 +139,25 @@ async function loadSnapshot(value){
   if(value.file){const c=next.clips[0];c.mediaKey??=crypto.randomUUID();files.set(c.mediaKey,value.file);if(value.meta)info.set(c.mediaKey,value.meta);}
   for(const c of next.clips)if(files.has(c.mediaKey)&&!info.has(c.mediaKey))try{info.set(c.mediaKey,await timeout(inspectMedia(files.get(c.mediaKey),c.kind),45000));}catch(e){diagnostic.mediaError=c.name+': '+e.message;}
   project=next;media=files;metas=info;selected=next.clips.some(c=>c.id===value.selected)?value.selected:next.clips[0]?.id||null;name=value.name||t('untitled');savedId=value.savedId||null;originalHeader=value.originalHeader||{};example=!!value.example;dirty=!!value.dirty;history=[];future=[];pendingTrim=null;
-  invalidateProjectFile();await releaseResult();preview.clear();preview.setProject(project,media);preview.seek(value.playhead||0);$('restoreBox').hidden=true;queueSave();say('projectReady');
+  invalidateProjectFile();await releaseResult();preview.clear();preview.setProject(project,media);preview.seek(value.playhead||0);updateSaveState();say('projectReady');
  }catch(e){say('importFailed',errorText(e));}finally{importing=false;render();}
 }
-$('saveDraft').onclick=async()=>{clearTimeout(saveTimer);await saveDraft();say('draftNote');};
-$('restore').onclick=async()=>{try{const v=await draft('get');if(v&&allowReplace())await loadSnapshot(v);}catch(e){say('saveFailed',e.message);}};
-draft('get').then(v=>$('restoreBox').hidden=!v?.project).catch(()=>{});
-$('newProject').onclick=async()=>{if(busy||importing||!allowReplace())return;importing=true;render();clearTimeout(saveTimer);await saveQueue.catch(()=>{});pause();await releaseResult();preview.clear();project=null;media=new Map();metas=new Map();selected=null;name='';savedId=null;dirty=false;example=false;history=[];future=[];originalHeader={};invalidateProjectFile();await draft('delete').catch(()=>{});$('projectDialog').close();$('restoreBox').hidden=true;importing=false;render();say('phaseHint');};
+$('saveProjectQuick').onclick=()=>saveNamed(false);
+const legacyRecovery=recoverLegacyDraft(t('recoveredCopy')).then(recovered=>{if(recovered)say('legacyRecovered');}).catch(e=>say('saveFailed',e.message));
+$('newProject').onclick=async()=>{if(busy||importing||!allowReplace())return;importing=true;render();pause();await releaseResult();preview.clear();project=null;media=new Map();metas=new Map();selected=null;name='';savedId=null;dirty=false;example=false;history=[];future=[];originalHeader={};invalidateProjectFile();$('projectDialog').close();importing=false;render();say('phaseHint');};
 async function renderProjects(){
  const host=$('projectList');host.textContent=t('loading');
- try{const list=await projects('list');host.replaceChildren();for(const rec of list.sort((a,b)=>b.savedAt-a.savedAt)){
+ try{await legacyRecovery;const list=await projects('list');host.replaceChildren();for(const rec of list.sort((a,b)=>b.savedAt-a.savedAt)){
   const row=document.createElement('div');row.className='project-row';const text=document.createElement('span');text.textContent=rec.name+' · '+new Date(rec.savedAt).toLocaleString(lang==='zh'?'zh-TW':'en');row.append(text);
   const open=document.createElement('button');open.textContent=t('open');open.onclick=()=>{if(busy||importing)return;if(allowReplace()){$('projectDialog').close();loadSnapshot({...rec,savedId:rec.id,dirty:false});}};row.append(open);
-  const del=document.createElement('button');del.textContent=t('delete');del.onclick=async()=>{if(busy||importing)return;if(confirm(t('deleteProjectConfirm')+' '+rec.name)){await projects('delete',rec.id);if(savedId===rec.id){savedId=null;dirty=true;queueSave();render();}await renderProjects();}};row.append(del);host.append(row);
+  const del=document.createElement('button');del.textContent=t('delete');del.onclick=async()=>{if(busy||importing)return;if(confirm(t('deleteProjectConfirm')+' '+rec.name)){await projects('delete',rec.id);if(savedId===rec.id){savedId=null;dirty=true;updateSaveState();render();}await renderProjects();}};row.append(del);host.append(row);
  }if(!list.length)host.textContent=t('noProjects');}catch(e){host.textContent=errorText(e);}
 }
 $('projectMenu').onclick=()=>{$('projectDialog').showModal();renderProjects();};$('closeProjects').onclick=()=>$('projectDialog').close();
 async function saveNamed(asNew){
- if(!project||busy||importing)return;const fresh=asNew||!savedId||example,proposed=fresh?prompt(t('projectName'),(name||t('untitled'))+(asNew||example?' '+t('copyName'):'')):name;if(!proposed?.trim())return;
+ if(!project||busy||importing)return false;const fresh=asNew||!savedId||example,proposed=fresh?prompt(t('projectName'),(name||t('untitled'))+(asNew||example?' '+t('copyName'):'')):name;if(!proposed?.trim())return false;
  importing=true;render();const id=fresh?crypto.randomUUID():savedId,rec={...snapshot(),id,savedId:id,name:proposed.trim(),example:false,dirty:false};
- try{await projects('put',id,rec);name=rec.name;savedId=id;example=false;dirty=false;await saveDraft();render();await renderProjects();say('namedSaved');}catch(e){say('saveFailed',e.message);}finally{importing=false;render();}
+ try{await projects('put',id,rec);name=rec.name;savedId=id;example=false;dirty=false;render();await renderProjects();say('namedSaved');return true;}catch(e){say('saveFailed',e.message);return false;}finally{importing=false;render();}
 }
 $('saveProject').onclick=()=>saveNamed(false);$('saveAs').onclick=()=>saveNamed(true);
 $('openProjectFile').onclick=()=>$('projectFile').click();
@@ -254,7 +249,7 @@ async function probe(){
  const report={secureContext:isSecureContext,videoEncoder:typeof VideoEncoder!=='undefined',audioEncoder:typeof AudioEncoder!=='undefined',webGPU:!!navigator.gpu,opfs:!!navigator.storage?.getDirectory,fileShare:!!navigator.canShare,standalone:matchMedia('(display-mode: standalone)').matches};
  for(const [key,fn] of Object.entries({h264_720p:()=>canEncodeVideo('avc',{width:1280,height:720,bitrate:4e6}),h264_1080p:()=>canEncodeVideo('avc',{width:1920,height:1080,bitrate:8e6}),h264_1080p_portrait:()=>canEncodeVideo('avc',{width:1080,height:1920,bitrate:8e6}),h264_4k:()=>canEncodeVideo('avc',{width:3840,height:2160,bitrate:16e6}),aac:()=>canEncodeAudio('aac',{sampleRate:48000,numberOfChannels:2,bitrate:192000})})){try{report[key]=await timeout(fn(),5000);}catch{report[key]='unknown';}}
  try{report.storage=await navigator.storage?.estimate();}catch{}
- diagnostic={...diagnostic,...report};return diagnostic;
+ diagnostic={...diagnostic,...report,preview:preview.diagnostics};return diagnostic;
 }
 $('diagnostics').onclick=async()=>{$('deviceDialog').showModal();$('deviceInfo').textContent='…';$('deviceInfo').textContent=JSON.stringify(await probe(),null,2);};
 $('closeDevice').onclick=()=>$('deviceDialog').close();$('copyDiagnostics').onclick=async()=>{try{await navigator.clipboard.writeText($('deviceInfo').textContent);say('copied');}catch{$('deviceInfo').focus();}};
@@ -262,8 +257,7 @@ document.querySelectorAll('[data-update-link]').forEach(link=>link.addEventListe
  event.preventDefault();
  if(busy||importing){say('updateBusy');return;}
  if(result&&!confirm(t('updateExportWarning')))return;
- clearTimeout(saveTimer);
- if(!await saveDraft()){say('saveFailed');return;}
+ if(project&&dirty&&!await saveNamed(false))return;
  location.assign(link.href);
 }));
 if('serviceWorker'in navigator){

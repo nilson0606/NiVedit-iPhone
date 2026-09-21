@@ -18,6 +18,8 @@ const server=http.createServer((req,res)=>{let name=decodeURIComponent(new URL(r
  try{
   await page.goto('http://127.0.0.1:8096/');await page.waitForFunction(()=>!!document.querySelector('#importHero').onclick);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);pass('empty mobile fits viewport');
+  await page.evaluate(()=>{window.projectWrites=[];const original=IDBDatabase.prototype.transaction;IDBDatabase.prototype.transaction=function(stores,mode,...rest){if(mode==='readwrite')projectWrites.push(stores);return original.call(this,stores,mode,...rest);};});
+
   await add('landscape.mp4',1);await change('out',2);await add('portrait.mp4',2);await change('out',2);
   assert.equal(await page.locator('#clipAt').inputValue(),'2.00');pass('multiple import appends to same video track');
   await change('clipAt',3);assert.equal(await page.locator('#clipAt').inputValue(),'3.00');pass('explicit gap remains');
@@ -31,9 +33,10 @@ const server=http.createServer((req,res)=>{let name=decodeURIComponent(new URL(r
   await add('overlay.png',4);await change('out',2);await change('clipAt',.5);
   await add('overlay2.png',5);await change('out',.5);await change('clipAt',1);
   await seek(1.2);await page.waitForTimeout(200);await download('phase2-images.mp4');pass('overlapping transparent images export');
+  await page.waitForTimeout(650);assert.deepEqual(await page.evaluate(()=>projectWrites),[]);pass('editing and video export perform no background project/draft writes');
   await page.locator('#projectMenu').click();await page.locator('#saveProject').click();await page.waitForFunction(()=>document.querySelectorAll('.project-row').length===1);pass('named project saved');
   await page.locator('#prepareProjectFile').click();const dl=page.waitForEvent('download');await page.locator('#downloadProject').click();await(await dl).saveAs(path.join(qa,'phase2.nvproj'));pass('portable project with embedded media');
-  await page.locator('#closeProjects').click();await page.reload();await page.locator('#restore').click();await page.waitForFunction(()=>document.querySelectorAll('.timeline-clip').length===5&&!document.querySelector('#export').disabled);pass('multi-media draft survives reload');
+  await page.locator('#closeProjects').click();await page.reload();await page.locator('#projectMenu').click();await page.locator('.project-row').first().getByRole('button',{name:'開啟',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.timeline-clip').length===5&&!document.querySelector('#export').disabled);pass('saved multi-media project survives reload');
   await page.locator('#newProject').click();await page.locator('#projectMenu').click();await page.locator('#projectFile').setInputFiles(path.join(qa,'phase2.nvproj'));await page.waitForFunction(()=>document.querySelectorAll('.timeline-clip').length===5&&!document.querySelector('#export').disabled);pass('nvproj reopens all media');
   await page.locator('#projectMenu').click();await page.locator('#saveAs').click();await page.waitForFunction(()=>document.querySelectorAll('.project-row').length===2);pass('save as preserves independent copy');await page.locator('#closeProjects').click();
 
