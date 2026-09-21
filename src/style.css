@@ -2,3 +2,9 @@
 .export-setting{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;font-size:14px}select{font:inherit;min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text);padding:10px;max-width:65%}select:focus-visible{outline:2px solid var(--accent)}
 
 .screen.has-media video{background:#000;outline:1px solid var(--line);min-width:0;min-height:0}
+
+.preview-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 12px;color:var(--muted);font-size:12px}
+.aspect-buttons{display:flex;gap:7px}.aspect-buttons button{display:flex;align-items:center;gap:7px;min-width:82px;justify-content:center;font-size:13px}
+.aspect-buttons button[aria-pressed=true]{background:var(--accent);color:var(--ink);border-color:var(--accent);font-weight:750}
+.shape{display:inline-block;border:1.5px solid currentColor;border-radius:2px}.shape.wide{width:19px;height:12px}.shape.tall{width:12px;height:19px}
+.screen.has-media{margin-inline:auto;border-radius:8px;border-color:var(--muted)}.screen.has-media video{max-height:none;outline:none}

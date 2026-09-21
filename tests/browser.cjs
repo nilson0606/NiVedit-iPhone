@@ -33,6 +33,19 @@ const server=http.createServer((req,res)=>{
  await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
  await page.screenshot({path:path.join(qa,'mobile-editor.png'),fullPage:true});
  const previewMean=await page.evaluate(()=>{const v=document.querySelector('#video'),c=document.createElement('canvas');c.width=c.height=32;const x=c.getContext('2d');x.drawImage(v,0,0,32,32);const a=x.getImageData(0,0,32,32).data;let sum=0;for(let i=0;i<a.length;i+=4)sum+=a[i]+a[i+1]+a[i+2];return sum/(32*32*3);});assert.ok(previewMean>20);check('restored preview has decoded pixels',previewMean);
+ await page.locator('#previewPortrait').click();
+ assert.equal(await page.locator('#exportDialog').isVisible(),false);
+ assert.equal(await page.locator('#previewPortrait').getAttribute('aria-pressed'),'true');
+ let previewFrame=await page.locator('#screen').boundingBox();assert.ok(Math.abs(previewFrame.width/previewFrame.height-9/16)<.01);
+ await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+ await page.screenshot({path:path.join(qa,'preview-9x16.png'),fullPage:true});check('portrait preview directly from editor');
+ await exportAndSave('output-preview-portrait.mp4');check('export follows editor preview selection');
+ await page.locator('#previewLandscape').click();
+ assert.equal(await page.locator('#previewLandscape').getAttribute('aria-pressed'),'true');
+ previewFrame=await page.locator('#screen').boundingBox();assert.ok(Math.abs(previewFrame.width/previewFrame.height-16/9)<.02);
+ await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+ await page.screenshot({path:path.join(qa,'preview-16x9.png'),fullPage:true});check('landscape preview directly from editor');
+
  async function exportAndSave(name,resolution=null,aspect=null){
   await page.locator('#export').click();if(aspect)await page.locator('#aspect').selectOption(aspect);if(resolution)await page.locator('#resolution').selectOption(String(resolution));await page.locator('#startExport').click();
   assert.equal(await page.locator('#resolution').isDisabled(),true);assert.equal(await page.locator('#aspect').isDisabled(),true);

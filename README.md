@@ -1,5 +1,5 @@
 # NiVedit iPhone
-Independent iPhone Web App, based on desktop V13 semantics. Phase 1 preview 0.1.2.
+Independent iPhone Web App, based on desktop V13 semantics. Phase 1 preview 0.1.3.
 Desktop NiVedit is not modified or deployed by this repository.
 
 - Site: https://nilson0606.github.io/NiVedit-iPhone/

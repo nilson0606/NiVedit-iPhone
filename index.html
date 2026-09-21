@@ -5,8 +5,8 @@
 <body><div class="app">
 <header><a class="brand" href="./">NiV<span>edit</span><small>iPhone</small></a><div class="header-actions"><button id="theme" aria-label="切換日夜模式">☀</button><button id="language">EN</button><button class="primary" id="export" disabled data-i18n="export">匯出</button></div></header>
 <main>
-<section class="viewer"><div class="section-line"><span class="eyebrow" data-i18n="preview">影片預覽</span><span class="badge">PREVIEW 0.1.2</span></div>
-<div class="screen" id="screen"><video id="video" playsinline preload="metadata"></video><div id="empty"><div class="empty-icon">＋</div><h1 data-i18n="emptyTitle">把日常，剪成故事。</h1><p data-i18n="emptyText">從相簿或檔案選一段影片開始</p><button class="primary" id="importHero" data-i18n="import">選擇影片</button></div></div>
+<section class="viewer"><div class="section-line"><span class="eyebrow" data-i18n="preview">影片預覽</span><span class="badge">PREVIEW 0.1.3</span></div>
+<div class="preview-toolbar"><span data-i18n="canvas">畫布比例</span><div class="aspect-buttons" role="group" aria-label="畫布比例"><button id="previewLandscape" aria-pressed="false" disabled><span class="shape wide" aria-hidden="true"></span>16:9</button><button id="previewPortrait" aria-pressed="false" disabled><span class="shape tall" aria-hidden="true"></span>9:16</button></div></div><div class="screen" id="screen"><video id="video" playsinline preload="metadata"></video><div id="empty"><div class="empty-icon">＋</div><h1 data-i18n="emptyTitle">把日常，剪成故事。</h1><p data-i18n="emptyText">從相簿或檔案選一段影片開始</p><button class="primary" id="importHero" data-i18n="import">選擇影片</button></div></div>
 <div class="transport"><button id="rewind" disabled aria-label="回到開頭">|◀</button><button id="play" disabled class="play" aria-label="播放或暫停">▶</button><output id="time">00:00.0 / 00:00.0</output><span class="chip" id="outputChip">720p · 30</span></div>
 <input type="range" id="seek" aria-label="播放位置" min="0" max="1" step="0.01" value="0" disabled>
 </section>
