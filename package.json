@@ -1,0 +1,13 @@
+{
+  "name": "nivedit-iphone",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "NiVedit iPhone Web App — phase 1 preview",
+  "scripts": {
+    "test": "node --test tests/model.test.mjs"
+  },
+  "dependencies": {
+    "mediabunny": "1.58.1"
+  }
+}

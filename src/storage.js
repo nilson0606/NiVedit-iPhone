@@ -1,0 +1,3 @@
+const DB='nivedit-iphone',STORE='drafts';
+function open(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
+export async function draft(action,value){const db=await open();try{return await new Promise((resolve,reject)=>{const tx=db.transaction(STORE,action==='get'?'readonly':'readwrite');const store=tx.objectStore(STORE);const req=action==='get'?store.get('current'):action==='put'?store.put(value,'current'):store.delete('current');let result;req.onsuccess=()=>result=req.result;tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('Storage aborted'));});}finally{db.close();}}
