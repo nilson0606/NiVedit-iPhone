@@ -11,3 +11,8 @@ for name,size in [('landscape','1280x720'),('portrait','360x640')]:
 run(['-display_rotation:v:0','90','-i',str(root/'landscape.mp4'),'-c','copy',str(root/'rotated.mp4')])
 print(root)
 
+
+# Transparent image fixtures for phase 2 composition checks.
+from PIL import Image, ImageDraw
+for name,color in [('overlay.png',(255,70,30,255)),('overlay2.png',(20,240,60,255))]:
+ im=Image.new('RGBA',(320,180),(0,0,0,0));ImageDraw.Draw(im).rectangle((110,50,210,130),fill=color);im.save(root/name)

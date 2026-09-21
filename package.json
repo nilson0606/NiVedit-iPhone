@@ -1,11 +1,11 @@
 {
   "name": "nivedit-iphone",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "NiVedit iPhone Web App — phase 1 preview",
+  "description": "NiVedit iPhone Web App - phase 2 multitrack preview",
   "scripts": {
-    "test": "node --test tests/model.test.mjs"
+    "test": "node --test tests/model.test.mjs tests/project.test.mjs"
   },
   "dependencies": {
     "mediabunny": "1.58.1"

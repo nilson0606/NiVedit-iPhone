@@ -1,4 +1,4 @@
-const VERSION='0.1.5';
+const VERSION='0.2.0';
 const CACHE='nivedit-iphone-'+VERSION;
 const base=self.registration.scope;
 self.addEventListener('install',event=>event.waitUntil((async()=>{
