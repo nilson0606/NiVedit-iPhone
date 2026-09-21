@@ -56,10 +56,10 @@ $('rewind').onclick=()=>{pause();video.currentTime=c().inP;};
 $('seek').oninput=()=>{pause();video.currentTime=+$('seek').value;updateTime();};
 function queueSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveDraft,500);}
 async function saveDraft(){
- if(!project||!file)return;
+ if(!project||!file)return true;
  const value={project:structuredClone(project),file,meta:structuredClone(meta),savedAt:Date.now()};
  saveQueue=saveQueue.catch(()=>{}).then(()=>draft('put',value));
- try{await saveQueue;$('draftState').textContent=t('saved');}catch(e){$('draftState').textContent=t('saveFailed');diagnostic.storageError=e.message;}
+ try{await saveQueue;$('draftState').textContent=t('saved');return true;}catch(e){$('draftState').textContent=t('saveFailed');diagnostic.storageError=e.message;return false;}
 }
 function recordBefore(){const before=JSON.stringify(project);if(history.at(-1)!==before)history.push(before);if(history.length>60)history.shift();future=[];}
 function applyTrim(start,end,{record=true}={}){
@@ -162,6 +162,21 @@ async function probe(){
 }
 $('diagnostics').onclick=async()=>{$('deviceDialog').showModal();$('deviceInfo').textContent='…';$('deviceInfo').textContent=JSON.stringify(await probe(),null,2);};
 $('closeDevice').onclick=()=>$('deviceDialog').close();$('copyDiagnostics').onclick=async()=>{try{await navigator.clipboard.writeText($('deviceInfo').textContent);say('copied');}catch{$('deviceInfo').focus();}};
-if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(e=>diagnostic.serviceWorkerError=e.message);
+document.querySelectorAll('[data-update-link]').forEach(link=>link.addEventListener('click',async event=>{
+ event.preventDefault();
+ if(busy||importing){say('updateBusy');return;}
+ if(result&&!confirm(t('updateExportWarning')))return;
+ clearTimeout(saveTimer);
+ if(!await saveDraft()){say('saveFailed');return;}
+ location.assign(link.href);
+}));
+if('serviceWorker'in navigator){
+ navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(registration=>{
+  const show=()=>{if(registration.waiting&&navigator.serviceWorker.controller)$('updateNotice').hidden=false;};
+  show();
+  registration.addEventListener('updatefound',()=>registration.installing?.addEventListener('statechange',show));
+  registration.update().then(show).catch(e=>diagnostic.serviceWorkerError=e.message);
+ }).catch(e=>diagnostic.serviceWorkerError=e.message);
+}
 render();
 

@@ -8,3 +8,5 @@
 .aspect-buttons button[aria-pressed=true]{background:var(--accent);color:var(--ink);border-color:var(--accent);font-weight:750}
 .shape{display:inline-block;border:1.5px solid currentColor;border-radius:2px}.shape.wide{width:19px;height:12px}.shape.tall{width:12px;height:19px}
 .screen.has-media{margin-inline:auto;border-radius:8px;border-color:var(--muted)}.screen.has-media video{max-height:none;outline:none}
+
+#updateNotice{grid-column:1/-1;margin-top:12px}#updateNotice .button{display:inline-block;margin-top:6px}#deviceDialog .button{display:inline-block}

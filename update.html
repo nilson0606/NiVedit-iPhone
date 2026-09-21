@@ -1,0 +1,36 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#111a23"><title>更新 NiVedit iPhone</title>
+<style>body{font:16px/1.8 system-ui,-apple-system,sans-serif;margin:0;background:#0c1219;color:#edf4fa}main{max-width:480px;margin:10vh auto;padding:28px}h1{font-size:27px;line-height:1.4}p{color:#b4c5d5}button,a{font:inherit;min-height:48px;border-radius:12px}button{padding:13px 20px;width:100%;border:0;background:#9fe5ca;color:#10251e;font-weight:750}button:disabled{opacity:.5}a{color:#9fe5ca;display:inline-block;margin-top:20px}#status{white-space:pre-wrap;border-left:3px solid #9fe5ca;padding-left:15px}small{color:#a1b3c5}progress{width:100%;accent-color:#9fe5ca}</style></head>
+<body><main><small>NiVedit iPhone · 更新工具</small><h1>取得最新版本</h1><p>此更新會保留已儲存的草稿與影片素材，不需要清除網站資料。</p><p>若剪輯頁還有未保存的改動，請先按「儲存草稿」。完成的影片也請先下載，再執行更新。</p><button id="update">更新並重新開啟</button><progress id="progress" hidden></progress><p id="status" role="status" aria-live="polite">按下按鈕後會下載並核對最新程式。</p><a href="./">返回剪輯頁</a><p><small>Keep your saved draft and media. Save any edits and download finished videos before updating. This tool updates the application only.</small></p></main>
+<script>
+const button=document.getElementById('update'),status=document.getElementById('status'),progress=document.getElementById('progress');
+const pause=ms=>new Promise(r=>setTimeout(r,ms));
+function versionOf(worker){if(!worker)return Promise.resolve(null);return new Promise(resolve=>{const channel=new MessageChannel();let finished=false;const finish=value=>{if(finished)return;finished=true;clearTimeout(timer);channel.port1.close();resolve(value);};const timer=setTimeout(()=>finish(null),800);channel.port1.onmessage=e=>finish(e.data?.version);try{worker.postMessage({type:'GET_VERSION'},[channel.port2]);}catch{finish(null);}});}
+button.onclick=async()=>{
+ button.disabled=true;progress.hidden=false;
+ try{
+  if(!('serviceWorker'in navigator))throw new Error('此瀏覽器無法使用更新工具，請使用 Safari 開啟。');
+  status.textContent='檢查最新版本…';
+  const response=await fetch('./release.json?check='+Date.now(),{cache:'no-store'});
+  if(!response.ok)throw new Error('無法取得版本資訊，請確認網路後重試。');
+  const release=await response.json();
+  if(typeof release.version!=='string'||!/^\d+\.\d+\.\d+$/.test(release.version))throw new Error('版本資訊無效。');
+  status.textContent='下載並核對 '+release.version+'，請保持此頁開啟…';
+  const registration=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});
+  await registration.update();
+  const deadline=Date.now()+120000;let target;
+  while(Date.now()<deadline){
+   const candidate=registration.waiting||registration.active;
+   if(await versionOf(candidate)===release.version){target=candidate;break;}
+   await pause(300);
+  }
+  if(!target)throw new Error('更新尚未完成，請稍後再按一次。原草稿未變更。');
+  if(target.state!=='activated'){
+   target.postMessage({type:'ACTIVATE_UPDATE'});
+   while(target.state!=='activated'&&Date.now()<deadline){if(target.state==='redundant')throw new Error('更新已被替換，請重試。');await pause(100);}
+  }
+  if(target.state!=='activated')throw new Error('等待新版本啟用逾時，請重試。');
+  status.textContent='已更新至 '+release.version+'，重新開啟中…';
+  location.replace('./?updated='+encodeURIComponent(release.version));
+ }catch(e){status.textContent=e.message||String(e);button.disabled=false;progress.hidden=true;}
+};
+</script></body></html>

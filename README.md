@@ -1,5 +1,5 @@
 # NiVedit iPhone
-Independent iPhone Web App, based on desktop V13 semantics. Phase 1 preview 0.1.3.
+Independent iPhone Web App, based on desktop V13 semantics. Phase 1 preview 0.1.4.
 Desktop NiVedit is not modified or deployed by this repository.
 
 - Site: https://nilson0606.github.io/NiVedit-iPhone/
@@ -9,7 +9,9 @@ Desktop NiVedit is not modified or deployed by this repository.
 - Local development: `python -m http.server 8093 --bind 127.0.0.1`, then open http://localhost:8093/.
 - Generate test fixtures: `python tests/make-fixtures.py --ffmpeg /path/to/ffmpeg`.
 - Tests: `node --test tests/model.test.mjs`; browser integration: `node tests/browser.cjs` (Playwright, Edge, generated QA fixtures).
-- No build required. Serve via HTTPS or localhost, not file://.
+- After app changes, bump package/model/SW/UI versions and run `python scripts/release.py` before deployment. release.json pins every precached asset hash; mixed or stale releases cannot install.
+- Serve via HTTPS or localhost, not file://.
+- Update recovery: update.html bypasses cached app code, validates the release, and activates only after the user clicks. Saved IndexedDB drafts and OPFS media are preserved.
 - Dependency: vendored, unmodified Mediabunny **1.58.1** (MPL-2.0), for lazy Blob reads, decoding, timed transcoding and muxing. No runtime CDN dependency. See [THIRD_PARTY.md](THIRD_PARTY.md).
 - Source video/audio never leaves the device. Files are held in local IndexedDB drafts and optional OPFS output storage.
 - Internal draft fields reuse V13 `clips/inP/outP/at/track/proj` meanings, but the phase-1 draft is NOT NVPROJ1. Desktop project round-trip is phase 2.

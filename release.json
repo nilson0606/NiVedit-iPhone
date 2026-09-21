@@ -1,0 +1,18 @@
+{
+  "version": "0.1.4",
+  "assets": {
+    "index.html": "ebe91907eaf9e74a8c446857669ad871561a205a83c4f9a7544106c1ab0d8f44",
+    "src/style.css": "9e725b298d275382f86ebcfbeb378a9205336f1ab97a9ed9e5f5c6c914baae3d",
+    "src/app.js": "8603b3a610cfcb839acb722ff15c66cf4dcea7689d9fa84ebaf11caed027424f",
+    "src/model.js": "1500adf9b10d8c370c3a8db0ed0e7aa5fe17683fb41bf15eb07b70288d9f1032",
+    "src/storage.js": "779694f7c66b6eac1613ba7a6fd71dbbde201bdbecd564d78c8d0f81c62e1fd1",
+    "src/i18n.js": "80714f6fb688e731f53b350639cdb0e2ba67136f9b875e52c2584c04796ad9d8",
+    "src/export-worker.js": "508c92d557925f0dbe2f090be663659e878ae988dc1e313c6aa376b152b20dfe",
+    "vendor/mediabunny.mjs": "71fad1b231b182cb21da67d69b1b9ee78505ab2ba1839d7e76de34472a30a0a4",
+    "manual.html": "9a7fe6fc9b718dcdf90bdbb105167bc8afcbb3f3571cde40636d9cf84ce99a51",
+    "manifest.webmanifest": "a5c2e419f74ed64d7af01301580f1ad17d6317086ee375287b234fd13be04dee",
+    "icons/icon-192.png": "25aa8396dd0d10b41b10eb655f46ca3ac3c904b7b67daf7a396195c1a6f1449a",
+    "icons/icon-512.png": "8198785e090095550e6109477d226e41d5538a253a38ac6eac490983caaa5295",
+    "icons/icon.svg": "4467487d47df3473cf94f260e215b1bc5df51dadbdcf8c2cb090dbdbd0afab64"
+  }
+}
