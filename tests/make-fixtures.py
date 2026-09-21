@@ -19,3 +19,7 @@ for name,color in [('overlay.png',(255,70,30,255)),('overlay2.png',(20,240,60,25
 
 # Complete-playback stress fixture, including high frame rate and B-frames.
 run(['-f','lavfi','-i','testsrc2=size=1920x1080:rate=60:duration=13','-f','lavfi','-i','sine=frequency=440:sample_rate=48000:duration=13','-c:v','libx264','-preset','veryfast','-crf','26','-g','120','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-shortest',str(root/'preview-13s-1080p60.mp4')])
+
+# Standalone audio categories and timing tests.
+for name,freq,codec in [('audio-own.wav',880,'pcm_s16le'),('audio-own.mp3',660,'libmp3lame'),('audio-own.m4a',1100,'aac')]:
+ run(['-f','lavfi','-i',f'sine=frequency={freq}:sample_rate=48000:duration=6','-c:a',codec,str(root/name)])

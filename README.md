@@ -1,12 +1,13 @@
 # NiVedit iPhone
 
-Independent iPhone Web App, desktop V13 semantics. **0.2.2, phase 2 preview.**
+Independent iPhone Web App, desktop V13 semantics. **0.2.3, local projects and categorized media/audio.**
 Desktop NiVedit and its restore points are unchanged.
 
 - Site: https://nilson0606.github.io/NiVedit-iPhone/
 - Baseline: nilson0606/NiVedit V13 at 1e73b55ea388e6b9f1c7925f0651846cdb8f20c0.
 - Plan: [To_IPhone.md](docs/To_IPhone.md).
-- Current fix: [preview-0.2.2.md](docs/preview-0.2.2.md); phase 2: [phase-2.md](docs/phase-2.md); historical [phase-1.md](docs/phase-1.md).
+- Current release: [local-projects-audio-0.2.3.md](docs/local-projects-audio-0.2.3.md).
+- Previous preview fix: [preview-0.2.2.md](docs/preview-0.2.2.md); phase 2: [phase-2.md](docs/phase-2.md); historical [phase-1.md](docs/phase-1.md).
 - Guide: [manual.html](manual.html).
 - Local: python -m http.server 8093 --bind 127.0.0.1. Use HTTPS/localhost, not file://.
 - Dependency: vendored unmodified Mediabunny 1.58.1 (MPL-2.0); see THIRD_PARTY.md. No runtime CDN.
@@ -32,4 +33,7 @@ After app edits, update package/model/SW/UI version and run python scripts/relea
 
 Preview playback: node tests/preview-playback.cjs measures the actual Web Audio output graph, overlaps/mute/pause, slow decode and black-frame continuity. Preview decodes video/audio in a disposable worker, renders each selected frame once, and schedules bounded PCM audio on the UI thread.
 
-Playback stress: node tests/preview-stress.cjs (13s 1080p60, five complete plays, 4x UI CPU throttle, repeat pause/seek, forced worker hangs). PREVIEW_BASELINE=ba9102c runs the previous build for comparison. The prior build also plays smoothly on this PC: the reported iPhone stutter remains unconfirmed pending real-device testing. The user declined to provide the source clip; use generic fixtures rather than clip-specific tuning.
+Playback stress: node tests/preview-stress.cjs (13s 1080p60, five complete plays, 4x UI CPU throttle, repeat pause/seek, forced worker hangs). PREVIEW_BASELINE=ba9102c runs the previous build for comparison. The prior build also plays smoothly on this PC: the user subsequently reported no stutter in the latest playback attempt on 0.2.2. This does not close every device/performance case. The user declined to provide the source clip; use generic fixtures rather than clip-specific tuning.
+
+0.2.3: Name new projects, save to My projects, and reopen from the home screen. Photos/Files video-image categories, Files audio import and the approved 41-track music catalog are available. User media stays in local IndexedDB and portable backups; no upload backend. Library MP3 files are fetched only when selected, verified by SHA-256, and embedded after adding/saving. Title/subtitle/GIF and advanced audio remain staged work. Audio-only projects can preview; MP4 export requires a visual clip.
+Audio/local storage integration: node tests/local-projects-audio.cjs. Music sources copied byte-for-byte from the desktop approved music_pack_41_v2; rejected trial packs are excluded.

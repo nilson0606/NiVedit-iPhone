@@ -28,3 +28,15 @@ test('time display carries tenths into minutes without 00:60.0',()=>{
  assert.equal(formatTime(119.96),'02:00.0');assert.equal(formatTime(-1),'00:00.0');
  assert.equal(formatTime(Infinity),'00:00.0');assert.equal(formatTime(NaN),'00:00.0');
 });
+
+import {addMusic,musicLayout,totalDuration,trimClip,splitClip,projectLimitations} from '../src/model.js';
+test('shortening video retains accessible later music and its source offsets',()=>{
+ const p=makeProject({name:'v.mp4'},{duration:10,width:1280,height:720});
+ const m=addMusic(p,{name:'m.wav'},{duration:8},6);trimClip(p,m.id,1,5,8);
+ p.clips[0].outP=3;
+ assert.equal(totalDuration(p),3);assert.equal(musicLayout(p)[0].at,6);assert.equal(musicLayout(p)[0].clip.inP,1);
+ assert.equal(musicLayout(p)[0].duration,4);assert.deepEqual(projectLimitations(p),[]);
+ p.clips[0].outP=10;const right=splitClip(p,m.id,8);
+ assert.equal(right.offset,3);assert.equal(right.startAt,8);assert.equal(right.mediaKey,m.mediaKey);
+ m.loop=true;assert.ok(projectLimitations(p).includes('musicEffects'));
+});

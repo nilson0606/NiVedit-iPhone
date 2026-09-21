@@ -26,7 +26,7 @@ const server=http.createServer((req,res)=>{
  await page.locator('#redo').click();assert.equal(await page.locator('#duration').textContent(),'4.00 s');check('undo / redo');
  await page.locator('#play').click();await page.waitForFunction(()=>Number(document.querySelector('#seek').value)>.15);await page.locator('#play').click();check('preview playback advances',await page.locator('#audioInfo').textContent());
  await page.locator('#saveProjectQuick').click();await page.waitForFunction(()=>document.querySelector('#saveState').textContent.includes('已儲存'));
- await page.reload();await page.locator('#projectMenu').click();await page.locator('.project-row').first().getByRole('button',{name:'開啟',exact:true}).click();
+ await page.reload();await page.locator('#projectMenu').click();await page.locator('#projectList .project-row').first().getByRole('button',{name:'開啟',exact:true}).click();
  await page.waitForFunction(()=>!document.querySelector('#export').disabled);
  assert.equal(await page.locator('#duration').textContent(),'4.00 s');check('saved project survives reload with original media');
  await page.waitForFunction(()=>{return !!document.querySelector('#canvas').dataset.frameReady;});
@@ -68,21 +68,21 @@ const server=http.createServer((req,res)=>{
 
  assert.equal(await page.locator('#outputChip').textContent(),'1080p · 30');
  await page.locator('#saveProjectQuick').click();await page.waitForFunction(()=>document.querySelector('#saveState').textContent.includes('已儲存'));
- await page.reload();await page.locator('#projectMenu').click();await page.locator('.project-row').first().getByRole('button',{name:'開啟',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('#export').disabled);
+ await page.reload();await page.locator('#projectMenu').click();await page.locator('#projectList .project-row').first().getByRole('button',{name:'開啟',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('#export').disabled);
  assert.equal(await page.locator('#outputChip').textContent(),'1080p · 30');check('1080p setting survives project reload');
  await page.locator('#export').click();assert.equal(await page.locator('#resolution').inputValue(),'1080');assert.equal(await page.locator('#aspect').inputValue(),'9:16');check('orientation survives project reopen');
  await page.locator('#resolution').selectOption('720');await page.locator('#closeExport').click();
  await page.locator('#undo').click();assert.equal(await page.locator('#outputChip').textContent(),'1080p · 30');
  await page.locator('#redo').click();assert.equal(await page.locator('#outputChip').textContent(),'720p · 30');check('resolution undo / redo');
 
- await page.locator('#newProject').click();await page.locator('#file').setInputFiles(path.join(qa,'portrait.mp4'));await page.waitForFunction(()=>document.querySelector('#filename').textContent==='portrait.mp4');
+ await page.locator('#newProject').click();await page.locator('#newProjectName').fill('新專案');await page.locator('#newProjectAspect').selectOption('9:16');await page.locator('#createProject').click();await page.locator('#file').setInputFiles(path.join(qa,'portrait.mp4'));await page.waitForFunction(()=>document.querySelector('#filename').textContent==='portrait.mp4');
  await exportAndSave('output-portrait.mp4');check('portrait output');
  await exportAndSave('output-1080-portrait.mp4',1080);check('1080p portrait export');
  await exportAndSave('output-portrait-to-landscape.mp4',1080,'16:9');check('portrait source to landscape canvas');
  await page.locator('#export').click();await page.screenshot({path:path.join(qa,'orientation-settings.png')});await page.locator('#closeExport').click();
 
  await page.locator('#export').click();await page.locator('#resolution').selectOption('720');assert.equal(await page.locator('#download').isHidden(),true);await page.locator('#closeExport').click();check('resolution change clears old result');
- await page.locator('#newProject').click();await page.locator('#file').setInputFiles(path.join(qa,'rotated.mp4'));await page.waitForFunction(()=>document.querySelector('#filename').textContent==='rotated.mp4');await exportAndSave('output-rotated.mp4');check('rotation metadata export');
+ await page.locator('#newProject').click();await page.locator('#newProjectName').fill('新專案');await page.locator('#newProjectAspect').selectOption('9:16');await page.locator('#createProject').click();await page.locator('#file').setInputFiles(path.join(qa,'rotated.mp4'));await page.waitForFunction(()=>document.querySelector('#filename').textContent==='rotated.mp4');await exportAndSave('output-rotated.mp4');check('rotation metadata export');
  await page.locator('#theme').click();await page.screenshot({path:path.join(qa,'mobile-light.png'),fullPage:true});check('light theme');
  await page.setViewportSize({width:844,height:390});await page.screenshot({path:path.join(qa,'landscape-ui.png'),fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);check('landscape viewport');
  await page.locator('#language').click();assert.equal(await page.locator('#export').textContent(),'Export');check('English');

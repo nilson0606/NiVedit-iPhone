@@ -1,5 +1,5 @@
 import {Input,BlobSource,ALL_FORMATS,VideoSampleSink,AudioSampleSink} from '../vendor/mediabunny.mjs';
-import {activeLayers,layout,totalDuration} from './model.js';
+import {activeLayers,layout,totalDuration,audioLayout} from './model.js';
 import {drawContained} from './composition.js';
 let project,files,canvas,ctx,audioStart=0,audioRows=[];
 const videos=new Map(),audios=new Map();
@@ -105,7 +105,7 @@ self.onmessage=async({data})=>{
   }else if(type==='audioStart'||type==='audio'){
    if(type==='audioStart'){
     audioStart=data.time;
-    audioRows=layout(project).filter(q=>q.clip.kind!=='image'&&!q.clip.muted&&!q.clip.mute&&(q.clip.vol??1)>0&&q.end>audioStart);
+    audioRows=audioLayout(project).filter(q=>q.end>audioStart);
    }
    const {chunks,transfer}=await audio(data.time,data.until);self.postMessage({type,id,chunks},transfer);
   }

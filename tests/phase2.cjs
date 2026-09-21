@@ -7,7 +7,7 @@ const server=http.createServer((req,res)=>{let name=decodeURIComponent(new URL(r
  page.on('pageerror',e=>{errors.push(e.message);console.log('PAGEERROR',e.message);});page.on('dialog',d=>d.accept(d.type()==='prompt'?'Phase2 test':undefined));
  const pass=name=>{report.push(name);console.log('PASS',name);};
  const change=async(id,value)=>{await page.locator('#'+id).fill(String(value));await page.locator('#'+id).dispatchEvent('change');};
- const add=async(file,count)=>{await page.locator('#file').setInputFiles(path.join(qa,file));await page.waitForFunction(n=>document.querySelectorAll('.timeline-clip').length===n&&!document.querySelector('#export').disabled,count,{timeout:60000});};
+ const add=async(file,count)=>{await page.locator(file.endsWith('.png')?'#imageFile':'#file').setInputFiles(path.join(qa,file));await page.waitForFunction(n=>document.querySelectorAll('.timeline-clip').length===n&&!document.querySelector('#export').disabled,count,{timeout:60000});};
  const seek=async t=>page.locator('#seek').evaluate((e,t)=>{e.value=t;e.dispatchEvent(new Event('input'));},t);
  async function download(name){
   await page.locator('#export').click();await page.locator('#startExport').click();
@@ -34,18 +34,18 @@ const server=http.createServer((req,res)=>{let name=decodeURIComponent(new URL(r
   await add('overlay2.png',5);await change('out',.5);await change('clipAt',1);
   await seek(1.2);await page.waitForTimeout(200);await download('phase2-images.mp4');pass('overlapping transparent images export');
   await page.waitForTimeout(650);assert.deepEqual(await page.evaluate(()=>projectWrites),[]);pass('editing and video export perform no background project/draft writes');
-  await page.locator('#projectMenu').click();await page.locator('#saveProject').click();await page.waitForFunction(()=>document.querySelectorAll('.project-row').length===1);pass('named project saved');
+  await page.locator('#projectMenu').click();await page.locator('#saveProject').click();await page.waitForFunction(()=>document.querySelectorAll('#projectList .project-row').length===1);pass('named project saved');
   await page.locator('#prepareProjectFile').click();const dl=page.waitForEvent('download');await page.locator('#downloadProject').click();await(await dl).saveAs(path.join(qa,'phase2.nvproj'));pass('portable project with embedded media');
-  await page.locator('#closeProjects').click();await page.reload();await page.locator('#projectMenu').click();await page.locator('.project-row').first().getByRole('button',{name:'開啟',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.timeline-clip').length===5&&!document.querySelector('#export').disabled);pass('saved multi-media project survives reload');
-  await page.locator('#newProject').click();await page.locator('#projectMenu').click();await page.locator('#projectFile').setInputFiles(path.join(qa,'phase2.nvproj'));await page.waitForFunction(()=>document.querySelectorAll('.timeline-clip').length===5&&!document.querySelector('#export').disabled);pass('nvproj reopens all media');
-  await page.locator('#projectMenu').click();await page.locator('#saveAs').click();await page.waitForFunction(()=>document.querySelectorAll('.project-row').length===2);pass('save as preserves independent copy');await page.locator('#closeProjects').click();
+  await page.locator('#closeProjects').click();await page.reload();await page.locator('#projectMenu').click();await page.locator('#projectList .project-row').first().getByRole('button',{name:'開啟',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.timeline-clip').length===5&&!document.querySelector('#export').disabled);pass('saved multi-media project survives reload');
+  await page.locator('#newProject').click();await page.locator('#newProjectName').fill('新專案');await page.locator('#createProject').click();await page.locator('#projectMenu').click();await page.locator('#projectFile').setInputFiles(path.join(qa,'phase2.nvproj'));await page.waitForFunction(()=>document.querySelectorAll('.timeline-clip').length===5&&!document.querySelector('#export').disabled);pass('nvproj reopens all media');
+  await page.locator('#projectMenu').click();await page.locator('#saveAs').click();await page.waitForFunction(()=>document.querySelectorAll('#projectList .project-row').length===2);pass('save as preserves independent copy');await page.locator('#closeProjects').click();
 
   // Unsupported desktop features remain editable as project data, never silently exported away.
   await page.evaluate(async()=>{
    const {readProject,writeProject}=await import('./src/project-file.js');const v=await readProject(await(await fetch('/qa/phase2.nvproj')).blob());v.project.titles=[{id:'future-title',text:'Retain me',extra:{x:7}}];v.project.future={value:42};
    const file=new File([writeProject(v.project,v.media,'Advanced',v.header)],'advanced.nvproj'),dt=new DataTransfer();dt.items.add(file);const input=document.querySelector('#projectFile');input.files=dt.files;input.dispatchEvent(new Event('change'));
   });
-  await page.waitForFunction(()=>document.querySelector('#projectName').textContent==='Advanced'&&!document.querySelector('#export').disabled);
+  await page.waitForFunction(()=>document.querySelector('#projectName').textContent.replace(/ •$/, '')==='Advanced'&&!document.querySelector('#export').disabled);
   assert.equal(await page.locator('#limitNotice').isVisible(),true);await change('in',.1);
   await page.locator('#export').click();await page.locator('#startExport').click();assert.equal(await page.locator('#download').isVisible(),false);assert.match(await page.locator('#exportStatus').textContent(),/尚不能/);await page.locator('#closeExport').click();
   await page.locator('#projectMenu').click();await page.locator('#prepareProjectFile').click();
@@ -56,11 +56,11 @@ const server=http.createServer((req,res)=>{let name=decodeURIComponent(new URL(r
    const {readProject}=await import('./src/project-file.js');const v=await readProject(await(await fetch('/qa/phase2.nvproj')).blob());const bytes=new TextEncoder().encode(JSON.stringify({...v.header,name:'Missing',index:[]})),len=new Uint8Array(4);new DataView(len.buffer).setUint32(0,bytes.length,true);
    const dt=new DataTransfer();dt.items.add(new File(['NVPROJ1',len,bytes],'missing.nvproj'));const input=document.querySelector('#projectFile');input.files=dt.files;input.dispatchEvent(new Event('change'));
   });
-  await page.waitForFunction(()=>document.querySelector('#projectName').textContent==='Missing'&&!document.querySelector('#export').disabled);assert.equal(await page.locator('.timeline-clip').count(),5);assert.equal(await page.locator('#repairMedia').isVisible(),true);
+  await page.waitForFunction(()=>document.querySelector('#projectName').textContent.replace(/ •$/, '')==='Missing'&&!document.querySelector('#export').disabled);assert.equal(await page.locator('.timeline-clip').count(),5);assert.equal(await page.locator('#repairMedia').isVisible(),true);
   await page.locator('#repairMedia').click();await page.locator('#repairFile').setInputFiles(path.join(qa,'landscape.mp4'));await page.waitForFunction(()=>document.querySelector('#repairMedia').hidden);pass('missing media clips retained and relinkable');
   await page.locator('#projectMenu').click();await page.locator('#openExample').click();await page.waitForFunction(()=>document.querySelectorAll('.timeline-clip').length===3&&!document.querySelector('#export').disabled);
   assert.match(await page.locator('#time').textContent(),/^00:00.0/);await download('phase2-example.mp4');
-  await page.locator('#projectMenu').click();await page.locator('#saveProject').click();await page.waitForFunction(()=>document.querySelectorAll('.project-row').length===3);await page.locator('#closeProjects').click();pass('720p example opens at start, exports, saves own copy');
+  await page.locator('#projectMenu').click();await page.locator('#saveProject').click();await page.waitForFunction(()=>document.querySelectorAll('#projectList .project-row').length===3);await page.locator('#closeProjects').click();pass('720p example opens at start, exports, saves own copy');
   // Move lower video to create a real leading blank and verify the compositor duration.
   await page.locator('.timeline-clip').filter({hasText:'lower.mp4'}).click();
   const grip=page.locator('.timeline-clip.selected .move-grip');await grip.scrollIntoViewIfNeeded();const box=await grip.boundingBox(),pps=await page.locator('#zoom').inputValue();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+Number(pps)*.5,box.y+box.height/2,{steps:5});await page.mouse.up();assert.equal(await page.locator('#clipAt').inputValue(),'0.50');await page.locator('#undo').click();assert.equal(await page.locator('#clipAt').inputValue(),'0.00');pass('visible drag handle forms one undoable move');

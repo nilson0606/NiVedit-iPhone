@@ -1,6 +1,6 @@
 {
   "name": "nivedit-iphone",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "type": "module",
   "description": "NiVedit iPhone Web App - phase 2 multitrack preview",

@@ -10,7 +10,8 @@ export async function inspectMedia(file,kind){
  const input=new Input({source:new BlobSource(file),formats:ALL_FORMATS});
  try{
   const v=await input.getPrimaryVideoTrack(),a=await input.getPrimaryAudioTrack(),duration=await input.computeDuration();
-  if(!v||!Number.isFinite(duration)||duration<.1)throw Error('INVALID_MEDIA');
+  if((!v&&!a)||!Number.isFinite(duration)||duration<.1)throw Error('INVALID_MEDIA');
+  if(kind==='audio'||!v){if(!a||!await a.canDecode())throw Error('AUDIO_DECODE_UNSUPPORTED');return {kind:'audio',duration,width:1280,height:720,hasAudio:true,audioCodec:a.codec};}
   if(!await v.canDecode())throw Error('VIDEO_DECODE_UNSUPPORTED');
   return {kind:'video',duration,width:v.displayWidth,height:v.displayHeight,hasAudio:!!a,codec:v.codec,audioCodec:a?.codec||null};
  }finally{input.dispose();}

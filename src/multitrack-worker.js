@@ -1,8 +1,8 @@
 import {Input,BlobSource,ALL_FORMATS,Output,Mp4OutputFormat,BufferTarget,StreamTarget,CanvasSink,CanvasSource,AudioSampleSink,AudioSample,AudioSampleSource,canEncodeVideo,canEncodeAudio} from '../vendor/mediabunny.mjs';
-import {layout,totalDuration,activeLayers,projectLimitations} from './model.js';
+import {layout,totalDuration,activeLayers,projectLimitations,timelineRows} from './model.js';
 import {drawContained} from './composition.js';
 self.onmessage=async({data})=>{
- const {project,media,jobId}=data,files=new Map(media),p=project.proj,duration=totalDuration(project),rows=layout(project);
+ const {project,media,jobId}=data,files=new Map(media),p=project.proj,duration=totalDuration(project),rows=timelineRows(project);
  const resources=new Map();let root,handle,output,success=false;
  try{
   if(projectLimitations(project).length)throw Error('UNSUPPORTED_PROJECT_FEATURES');
@@ -15,7 +15,7 @@ self.onmessage=async({data})=>{
    if(q.clip.kind!=='image'){
     r.input=new Input({source:new BlobSource(file),formats:ALL_FORMATS});
     r.video=await r.input.getPrimaryVideoTrack();r.audio=await r.input.getPrimaryAudioTrack();
-    if(!r.video||!await r.video.canDecode())throw Error('VIDEO_DECODE_UNSUPPORTED: '+q.clip.name);
+    if(q.clip.kind!=='audio'&&(!r.video||!await r.video.canDecode()))throw Error('VIDEO_DECODE_UNSUPPORTED: '+q.clip.name);
     if(r.audio&&!q.clip.muted&&!q.clip.mute&&q.clip.vol!==0&&!await r.audio.canDecode())throw Error('AUDIO_DECODE_UNSUPPORTED: '+q.clip.name);
    }
   }
